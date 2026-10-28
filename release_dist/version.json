@@ -1,11 +1,13 @@
 {
-  "version": "1.2.2",
+  "version": "1.2.3",
   "appName": "Tìm Bus Promax",
   "release_date": "2026-10-28",
   "changelog": [
-    "Cập nhật logo biểu tượng ứng dụng mới phong cách hiện đại với tông màu xanh VNPT đặc trưng.",
-    "Tích hợp logo VNPT Blue vào icon launcher cài đặt PWA/Mobile và huy hiệu ứng dụng trên Header.",
-    "Đồng bộ toàn bộ bảng màu nhận diện thương hiệu VNPT Blue trong toàn ứng dụng."
+    "Khắc phục thao tác chạm trên điện thoại: Bấm trực tiếp vào xe để xem thông tin & canh xe xuất bến mượt mà.",
+    "Bổ sung nút ngôi sao vàng (★/☆) trong danh sách tìm kiếm điểm dừng để ghim/bỏ ghim nhanh chóng.",
+    "Khi chọn điểm dừng bất kỳ, luôn giữ nguyên hiển thị highlight lộ trình tuyến và toàn bộ xe đang chạy realtime.",
+    "Bấm vào logo góc trên bên trái để quay về trạng thái trang chủ ban đầu.",
+    "Mặc định thu gọn khay danh sách dưới khi mở app, bổ sung nút '▼ Đóng' trực quan để thu hẹp nhanh chóng."
   ],
   "download_urls": {
     "web": "/",
