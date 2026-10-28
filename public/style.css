@@ -450,6 +450,36 @@ body.top-controls-collapsed .top-bar {
     transform: scale(0.96);
 }
 
+.saved-station-chip.chip-dir-go {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12);
+}
+.saved-station-chip.chip-dir-go:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+.saved-station-chip.chip-dir-go .chip-del-btn {
+    background: rgba(29, 78, 216, 0.12);
+    color: #1d4ed8;
+}
+
+.saved-station-chip.chip-dir-ret {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #c2410c;
+    box-shadow: 0 1px 3px rgba(234, 88, 12, 0.12);
+}
+.saved-station-chip.chip-dir-ret:hover {
+    background: #ffedd5;
+    border-color: #fdba74;
+}
+.saved-station-chip.chip-dir-ret .chip-del-btn {
+    background: rgba(194, 65, 12, 0.12);
+    color: #c2410c;
+}
+
 .chip-del-btn {
     background: rgba(133, 77, 14, 0.15);
     border: none;

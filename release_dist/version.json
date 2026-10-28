@@ -1,13 +1,11 @@
 {
-  "version": "1.2.0",
+  "version": "1.2.1",
   "appName": "Tìm Bus Promax",
   "release_date": "2026-10-28",
   "changelog": [
-    "Khắc phục triệt để lỗi cảnh báo xe ngược chiều & xe đã đi qua trạm.",
-    "Bổ sung nút Thu gọn / Hiện thanh tìm kiếm & thông tin tuyến để mở rộng tối đa bản đồ.",
-    "Đổi tên ứng dụng thành Tìm Bus Promax với icon xe buýt vector trực quan theo chiều.",
-    "Hỗ trợ lưu nhiều điểm dừng yêu thích cho từng tuyến xe buýt.",
-    "Tích hợp hệ thống tự động kiểm tra và cập nhật ứng dụng bảo lưu dữ liệu 100%."
+    "Tách biệt hiển thị điểm dừng đã lưu theo từng chiều: Chiều đi chỉ hiện điểm chiều đi, Chiều về chỉ hiện điểm chiều về.",
+    "Nhuộm màu trực quan cho nhãn điểm dừng đã lưu: Xanh dương cho Chiều đi, Cam cho Chiều về.",
+    "Tự động đồng bộ và lọc danh sách trạm đã lưu khi chuyển đổi giữa Chiều đi và Chiều về."
   ],
   "download_urls": {
     "web": "/",

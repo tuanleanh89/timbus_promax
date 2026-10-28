@@ -509,7 +509,7 @@ window.toggleFavStation = function(stationId, stationName, lat, lng) {
     const routeCode = currentRoute.code;
     let favList = getSavedFavStations(routeCode);
 
-    const existingIdx = favList.findIndex(s => s.stationId === stationId);
+    const existingIdx = favList.findIndex(s => s.stationId === stationId && (s.direction ? s.direction === currentDirection : true));
     if (existingIdx !== -1) {
         favList.splice(existingIdx, 1);
     } else {
@@ -517,7 +517,8 @@ window.toggleFavStation = function(stationId, stationName, lat, lng) {
             stationId,
             name: stationName,
             lat,
-            lng
+            lng,
+            direction: currentDirection
         });
     }
 
@@ -530,7 +531,7 @@ window.removeFavStation = function(stationId) {
     if (!currentRoute) return;
     const routeCode = currentRoute.code;
     let favList = getSavedFavStations(routeCode);
-    favList = favList.filter(s => s.stationId !== stationId);
+    favList = favList.filter(s => !(s.stationId === stationId && (s.direction ? s.direction === currentDirection : true)));
     saveFavStations(routeCode, favList);
     renderCurrentDirection();
     updateSavedStationsBar();
@@ -559,16 +560,51 @@ function updateSavedStationsBar() {
         return;
     }
 
-    const favList = getSavedFavStations(currentRoute.code);
-    if (!favList || favList.length === 0) {
+    const allFavList = getSavedFavStations(currentRoute.code);
+    if (!allFavList || allFavList.length === 0) {
         savedStationsBar.style.display = 'none';
         return;
     }
 
-    savedStationsList.innerHTML = favList.map(s => {
+    // Lấy danh sách trạm thuộc chiều hiện tại
+    const curStations = (currentDirection === 'go' ? currentRoute.go.stations : currentRoute.ret.stations) || [];
+    const curStationIds = new Set(curStations.map(s => s.stationId));
+
+    const otherStations = (currentDirection === 'go' ? currentRoute.ret.stations : currentRoute.go.stations) || [];
+    const otherStationIds = new Set(otherStations.map(s => s.stationId));
+
+    // LỌC CHUẨN XÁC: Chiều đi chỉ hiện điểm ở chiều đi, Chiều về chỉ hiện điểm ở chiều về
+    const dirFavList = allFavList.filter(s => {
+        if (s.direction) {
+            return s.direction === currentDirection;
+        }
+        if (curStationIds.has(s.stationId)) {
+            return true;
+        }
+        if (otherStationIds.has(s.stationId)) {
+            return false;
+        }
+        return false;
+    });
+
+    if (dirFavList.length === 0) {
+        savedStationsBar.style.display = 'none';
+        return;
+    }
+
+    const isGo = currentDirection === 'go';
+    const dirLabel = isGo ? 'Chiều đi' : 'Chiều về';
+    const dirChipClass = isGo ? 'chip-dir-go' : 'chip-dir-ret';
+
+    const headerTitle = document.getElementById('saved-title-text');
+    if (headerTitle) {
+        headerTitle.innerText = `Đã lưu (${dirLabel}):`;
+    }
+
+    savedStationsList.innerHTML = dirFavList.map(s => {
         const cleanName = s.name.replace(/^[0-9A-Z\(\)\s,-]+ - /, '') || s.name;
         return `
-            <div class="saved-station-chip" onclick="panToSavedStation(${s.stationId}, ${s.lat}, ${s.lng})" title="Bấm để xem trạm ${s.name}">
+            <div class="saved-station-chip ${dirChipClass}" onclick="panToSavedStation(${s.stationId}, ${s.lat}, ${s.lng})" title="Bấm để xem trạm ${s.name} (${dirLabel})">
                 <span class="chip-name">⭐ ${cleanName}</span>
                 <button class="chip-del-btn" onclick="event.stopPropagation(); removeFavStation(${s.stationId})" title="Bỏ lưu trạm này">✕</button>
             </div>
@@ -582,15 +618,19 @@ function updateSavedStationsBar() {
 if (routeBadgeBox) {
     routeBadgeBox.addEventListener('click', () => {
         if (!currentRoute) return;
-        // Xổ ngay danh sách 47 điểm dừng ở Bottom Sheet
+        // Xổ ngay danh sách các điểm dừng ở Bottom Sheet
         switchTab('tab-stations');
         bottomSheet.classList.remove('collapsed');
         bottomSheet.classList.add('expanded');
 
-        // Nếu người dùng đã lưu trạm hay đi, cuộn mượt tới trạm đầu tiên đã lưu
-        const favList = getSavedFavStations(currentRoute.code);
-        if (favList && favList.length > 0) {
-            const firstFav = favList[0];
+        // Nếu người dùng đã lưu trạm hay đi, cuộn mượt tới trạm đầu tiên đã lưu của chiều hiện tại
+        const curStations = (currentDirection === 'go' ? currentRoute.go.stations : currentRoute.ret.stations) || [];
+        const curStationIds = new Set(curStations.map(s => s.stationId));
+        const allFav = getSavedFavStations(currentRoute.code);
+        const curFav = allFav.filter(s => (s.direction ? s.direction === currentDirection : curStationIds.has(s.stationId)));
+
+        if (curFav && curFav.length > 0) {
+            const firstFav = curFav[0];
             setTimeout(() => {
                 const el = document.getElementById(`station-item-${firstFav.stationId}`);
                 if (el) {
@@ -610,6 +650,7 @@ btnDirGo.addEventListener('click', () => {
     btnDirGo.classList.add('active');
     btnDirRet.classList.remove('active');
     renderCurrentDirection();
+    updateSavedStationsBar();
     fetchRealtimeBuses();
 });
 
@@ -619,6 +660,7 @@ btnDirRet.addEventListener('click', () => {
     btnDirRet.classList.add('active');
     btnDirGo.classList.remove('active');
     renderCurrentDirection();
+    updateSavedStationsBar();
     fetchRealtimeBuses();
 });
 
@@ -861,7 +903,7 @@ function renderCurrentDirection() {
     const favList = getSavedFavStations(currentRoute.code);
     stationCountSpan.innerText = stations.length;
     stationList.innerHTML = stations.map((st, idx) => {
-        const isFav = favList.some(s => s.stationId === st.stationId || s.name === st.name);
+        const isFav = favList.some(s => s.stationId === st.stationId && (s.direction ? s.direction === currentDirection : true));
         return `
         <div id="station-item-${st.stationId}" class="station-item ${isFav ? 'is-fav' : ''}" onclick="panToStation(${st.lat}, ${st.lng})">
             <div class="station-order">${st.order || (idx + 1)}</div>
@@ -1768,7 +1810,7 @@ function showLoading(show, text = 'Đang tải...') {
 // ==========================================
 // 4. AUTO-UPDATE APP ENGINE (Tự động cập nhật & Bảo lưu 100% dữ liệu)
 // ==========================================
-const APP_CURRENT_VERSION = '1.2.0';
+const APP_CURRENT_VERSION = '1.2.1';
 const DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/tuanleanh89/timbus_promax/main/version.json';
 
 const btnCheckUpdate = document.getElementById('btn-check-update');
