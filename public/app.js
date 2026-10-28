@@ -1810,7 +1810,7 @@ function showLoading(show, text = 'Đang tải...') {
 // ==========================================
 // 4. AUTO-UPDATE APP ENGINE (Tự động cập nhật & Bảo lưu 100% dữ liệu)
 // ==========================================
-const APP_CURRENT_VERSION = '1.2.1';
+const APP_CURRENT_VERSION = '1.2.2';
 const DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/tuanleanh89/timbus_promax/main/version.json';
 
 const btnCheckUpdate = document.getElementById('btn-check-update');

@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Tìm Bus Promax - Bản đồ Realtime & Cảnh báo xe đến</title>
-    <meta name="theme-color" content="#1976d2">
+    <meta name="theme-color" content="#0066cc">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
 
     <!-- Leaflet Map CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -26,9 +27,7 @@
             <div class="brand">
                 <div class="brand-left">
                     <div class="bus-icon-badge">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="#1976d2">
-                            <path d="M4 16c0 .55.45 1 1 1h1v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V17h6v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V17h1c.55 0 1-.45 1-1V6c0-1.66-1.34-3-3-3H7C5.34 3 4 4.34 4 6v10zm2-10h12v4H6V6zm1.5 7.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
-                        </svg>
+                        <img src="icon.png" alt="Tìm Bus Promax">
                     </div>
                     <div class="brand-text">
                         <h1>Tìm Bus Promax</h1>
@@ -38,7 +37,7 @@
                 <div class="brand-actions">
                     <button id="btn-check-update" class="btn-check-update" title="Kiểm tra bản cập nhật mới nhất">
                         <span id="update-icon" class="update-icon">🔄</span>
-                        <span id="update-text" class="update-text">v1.2.1</span>
+                        <span id="update-text" class="update-text">v1.2.2</span>
                     </button>
                     <button id="btn-toggle-top-controls" class="btn-toggle-top-controls" title="Ẩn/hiện ô tìm kiếm & thông tin tuyến để mở rộng bản đồ">
                         <span id="toggle-top-icon">▲</span>
@@ -178,7 +177,7 @@
                         <div class="app-version-header">
                             <div>
                                 <div style="font-weight: 800; font-size: 14.5px; color: #0f172a;">Tìm Bus Promax</div>
-                                <div style="font-size: 12px; color: #64748b;">Phiên bản: <b id="info-current-ver">v1.2.1</b></div>
+                                <div style="font-size: 12px; color: #64748b;">Phiên bản: <b id="info-current-ver">v1.2.2</b></div>
                             </div>
                             <button id="btn-manual-check-update" class="btn-primary" style="padding: 6px 12px; font-size: 12px; border-radius: 8px;">
                                 🔄 Kiểm tra cập nhật

@@ -1,11 +1,11 @@
 {
-  "version": "1.2.1",
+  "version": "1.2.2",
   "appName": "Tìm Bus Promax",
   "release_date": "2026-10-28",
   "changelog": [
-    "Tách biệt hiển thị điểm dừng đã lưu theo từng chiều: Chiều đi chỉ hiện điểm chiều đi, Chiều về chỉ hiện điểm chiều về.",
-    "Nhuộm màu trực quan cho nhãn điểm dừng đã lưu: Xanh dương cho Chiều đi, Cam cho Chiều về.",
-    "Tự động đồng bộ và lọc danh sách trạm đã lưu khi chuyển đổi giữa Chiều đi và Chiều về."
+    "Cập nhật logo biểu tượng ứng dụng mới phong cách hiện đại với tông màu xanh VNPT đặc trưng.",
+    "Tích hợp logo VNPT Blue vào icon launcher cài đặt PWA/Mobile và huy hiệu ứng dụng trên Header.",
+    "Đồng bộ toàn bộ bảng màu nhận diện thương hiệu VNPT Blue trong toàn ứng dụng."
   ],
   "download_urls": {
     "web": "/",
