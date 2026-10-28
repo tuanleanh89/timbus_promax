@@ -37,7 +37,7 @@
                 <div class="brand-actions">
                     <button id="btn-check-update" class="btn-check-update" title="Kiểm tra bản cập nhật mới nhất">
                         <span id="update-icon" class="update-icon">🔄</span>
-                        <span id="update-text" class="update-text">v1.2.3</span>
+                        <span id="update-text" class="update-text">v1.2.4</span>
                     </button>
                     <button id="btn-toggle-top-controls" class="btn-toggle-top-controls" title="Ẩn/hiện ô tìm kiếm & thông tin tuyến để mở rộng bản đồ">
                         <span id="toggle-top-icon">▲</span>
@@ -106,6 +106,26 @@
                 <div class="alert-status-text" id="departure-banner-status">Khi xe bắt đầu di chuyển sẽ đổ chuông & gọi...</div>
             </div>
             <button id="btn-stop-departure" class="alert-stop-btn">Hủy canh</button>
+        </div>
+
+        <!-- Station Focus Card (Tự động tính khoảng cách, ETA & Highlight xe gần nhất) -->
+        <div id="station-focus-card" class="station-focus-card" style="display: none;">
+            <div class="station-focus-header">
+                <div class="station-focus-title">
+                    <span class="station-focus-icon">🚏</span>
+                    <div class="station-focus-texts">
+                        <div class="station-focus-name" id="station-focus-name">Điểm dừng đã chọn</div>
+                        <div class="station-focus-sub" id="station-focus-sub">
+                            <span class="dir-pill pill-go" id="station-focus-dir">Chiều đi</span>
+                            <span id="station-focus-route-tag" style="font-size: 11.5px; color: #475569; margin-left: 6px;">Tuyến 83</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="btn-close-station-focus" class="station-focus-close" title="Bỏ chọn trạm này">✕ Bỏ chọn</button>
+            </div>
+            <div id="station-focus-content" class="station-focus-content">
+                <!-- Sẽ được fill động bởi updateStationFocusUI() -->
+            </div>
         </div>
 
         <!-- Toast notification for desktop location hint -->
@@ -178,7 +198,7 @@
                         <div class="app-version-header">
                             <div>
                                 <div style="font-weight: 800; font-size: 14.5px; color: #0f172a;">Tìm Bus Promax</div>
-                                <div style="font-size: 12px; color: #64748b;">Phiên bản: <b id="info-current-ver">v1.2.3</b></div>
+                                <div style="font-size: 12px; color: #64748b;">Phiên bản: <b id="info-current-ver">v1.2.4</b></div>
                             </div>
                             <button id="btn-manual-check-update" class="btn-primary" style="padding: 6px 12px; font-size: 12px; border-radius: 8px;">
                                 🔄 Kiểm tra cập nhật

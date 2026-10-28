@@ -201,6 +201,7 @@ const btnHangupCall = document.getElementById('btn-hangup-call');
 
 const locationHintToast = document.getElementById('location-hint-toast');
 const btnCloseToast = document.getElementById('btn-close-toast');
+const btnCloseStationFocus = document.getElementById('btn-close-station-focus');
 
 const bottomSheet = document.getElementById('bottom-sheet');
 const sheetHandle = document.getElementById('sheet-handle');
@@ -590,19 +591,15 @@ window.removeFavStation = function(stationId) {
 };
 
 window.panToSavedStation = function(stationId, lat, lng) {
-    panToStation(lat, lng);
-    switchTab('tab-stations');
-    bottomSheet.classList.remove('collapsed');
-    bottomSheet.classList.add('expanded');
-
-    setTimeout(() => {
-        const el = document.getElementById(`station-item-${stationId}`);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            el.classList.add('highlight-target');
-            setTimeout(() => el.classList.remove('highlight-target'), 2500);
+    if (currentRoute) {
+        const curStations = (currentDirection === 'go' ? currentRoute.go.stations : currentRoute.ret.stations) || [];
+        const found = curStations.find(s => s.stationId === stationId);
+        if (found) {
+            selectStation({ ...found, direction: currentDirection });
+            return;
         }
-    }, 300);
+    }
+    selectStation({ stationId, name: 'Điểm dừng đã lưu', lat, lng, direction: currentDirection });
 };
 
 function updateSavedStationsBar() {
@@ -787,34 +784,6 @@ function calculateBearing(lat1, lon1, lat2, lon2) {
     return (brng + 360) % 360;
 }
 
-// Helper: Update Popup Content for live bus
-function updateBusPopup(marker, b) {
-    const rawPlate = String(b.plate || '').trim();
-    const isGo = b.isGo !== false;
-    const dirTag = isGo ? '➜ Chiều đi' : '⬅ Chiều về';
-    const dirColor = isGo ? '#0284c7' : '#ea580c';
-    const dirBg = isGo ? '#e0f2fe' : '#ffedd5';
-
-    marker.setPopupContent(`
-        <div style="font-family: inherit; font-size: 13.5px; min-width: 215px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
-                <span style="font-weight: 800; font-size: 16px; color: #0f172a;">🚌 ${rawPlate}</span>
-                <span style="background: ${dirBg}; color: ${dirColor}; font-size: 11.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px;">${dirTag}</span>
-            </div>
-            <div style="margin-top: 6px; color: #475569; font-size: 12.5px;">Hướng đi: <b style="color: #0f172a;">${b.directionText || b.fleetCode || 'Đang lưu thông'}</b></div>
-            <div style="margin-top: 3px; color: #475569; font-size: 12.5px;">Trạm sắp tới: <b style="color: #0f172a;">${b.nextStation || 'Dọc tuyến'}</b></div>
-            <div style="margin-top: 8px; padding: 6px 10px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; font-weight: 700; color: #ea580c; display: flex; justify-content: space-between;">
-                <span>Cách: ${b.partRemained >= 1000 ? (b.partRemained/1000).toFixed(1) + ' km' : Math.round(b.partRemained || 0) + ' m'}</span>
-                <span>còn ~${Math.max(1, Math.round((b.timeRemained || 0)/60))} phút</span>
-            </div>
-            <button onclick="openDepartureModal('${rawPlate}', '${b.fleet || (currentRoute ? currentRoute.code : '')}', '${(b.nextStation || '').replace(/'/g, "\\'")}', ${b.partRemained || 0}, ${b.lat}, ${b.lng})" 
-                    style="width: 100%; margin-top: 8px; background: #2563eb; color: #fff; border: none; padding: 7px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
-                🚀 Canh xe này khi xuất bến
-            </button>
-        </div>
-    `);
-}
-
 // Helper: Vector SVG Bus Icon for authentic vehicle representation
 function getBusSvgIcon(color = 'currentColor', size = 16) {
     return `<svg class="bus-badge-svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="${color}" style="vertical-align: middle; display: inline-block;">
@@ -822,33 +791,138 @@ function getBusSvgIcon(color = 'currentColor', size = 16) {
     </svg>`;
 }
 
-// Helper: Create authentic Bus Marker Pill (Chuẩn giao diện App gốc Tìm Buýt có phân biệt chiều đi/về)
-function createBusMarker(b) {
+// Helper: Generate HTML for authentic Bus Marker Pill (có hỗ trợ badge xe gần nhất khi chọn trạm)
+function getBusMarkerHtml(b, isNearest = false) {
     const rawPlate = String(b.plate || '').trim();
     const numMatch = rawPlate.match(/[0-9]{4,5}$/);
     const plateNum = numMatch ? numMatch[0] : (rawPlate.replace(/[^0-9]/g, '').slice(-5) || rawPlate);
     const isGo = b.isGo !== false;
     const dirClass = isGo ? 'bus-dir-go' : 'bus-dir-ret';
     const dirTag = isGo ? '➜ Đi' : '⬅ Về';
-    const busSvgColor = isGo ? '#38bdf8' : '#fb923c';
+    const busSvgColor = isNearest ? '#fbbf24' : (isGo ? '#38bdf8' : '#fb923c');
+    const nearestClass = isNearest ? 'bus-marker-nearest' : '';
 
-    const iconHtml = `
-        <div class="bus-marker-badge ${dirClass}" title="${rawPlate} (${b.directionText || b.fleetCode || ''})">
+    let extraBadge = '';
+    if (isNearest && b.relToStation) {
+        const dText = b.relToStation.distanceMeters >= 1000 
+            ? (b.relToStation.distanceMeters / 1000).toFixed(1) + 'km' 
+            : b.relToStation.distanceMeters + 'm';
+        extraBadge = `<span class="bus-nearest-pill">⭐ ${dText} (~${b.relToStation.etaMinutes}p)</span>`;
+    } else if (b.relToStation && !b.relToStation.hasPassed && b.relToStation.distanceMeters) {
+        const dText = b.relToStation.distanceMeters >= 1000 
+            ? (b.relToStation.distanceMeters / 1000).toFixed(1) + 'km' 
+            : b.relToStation.distanceMeters + 'm';
+        extraBadge = `<span class="bus-subdist-pill">${dText}</span>`;
+    }
+
+    return `
+        <div class="bus-marker-badge ${dirClass} ${nearestClass}" 
+             onclick="event.stopPropagation(); window.openBusMarkerPopup('${rawPlate}')" 
+             ontouchend="event.stopPropagation(); window.openBusMarkerPopup('${rawPlate}')"
+             title="${rawPlate} (${b.directionText || b.fleetCode || ''})">
             <span class="bus-icon-graphic">${getBusSvgIcon(busSvgColor, 16)}</span>
             <span class="bus-status-dot"></span>
             <span class="bus-plate-num">${plateNum}</span>
             <span class="bus-dir-tag">${dirTag}</span>
+            ${extraBadge}
+        </div>
+    `;
+}
+
+// Helper: Update Popup Content for live bus
+function updateBusPopup(marker, b) {
+    if (!marker) return;
+    const rawPlate = String(b.plate || '').trim();
+    const isGo = b.isGo !== false;
+    const dirTag = isGo ? '➜ Chiều đi' : '⬅ Chiều về';
+    const dirColor = isGo ? '#0284c7' : '#ea580c';
+    const dirBg = isGo ? '#e0f2fe' : '#ffedd5';
+
+    let distNotice = '';
+    if (currentStation && b.relToStation) {
+        if (b.relToStation.isSameDir) {
+            if (b.relToStation.hasPassed) {
+                distNotice = `<div style="margin-top: 6px; padding: 5px 8px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; color: #dc2626; font-size: 12px; font-weight: 700;">⚠️ Xe đã đi qua trạm đang chọn (${currentStation.name})</div>`;
+            } else {
+                const dText = b.relToStation.distanceMeters >= 1000 ? (b.relToStation.distanceMeters/1000).toFixed(1) + ' km' : b.relToStation.distanceMeters + ' m';
+                distNotice = `<div style="margin-top: 6px; padding: 5px 8px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; color: #1e40af; font-size: 12px; font-weight: 700; display: flex; justify-content: space-between;">
+                    <span>Đến trạm ${currentStation.name}:</span>
+                    <span>${dText} (~${b.relToStation.etaMinutes}p)</span>
+                </div>`;
+            }
+        }
+    }
+
+    const popupHtml = `
+        <div style="font-family: inherit; font-size: 13.5px; min-width: 220px; padding: 2px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+                <span style="font-weight: 800; font-size: 16px; color: #0f172a;">🚌 ${rawPlate}</span>
+                <span style="background: ${dirBg}; color: ${dirColor}; font-size: 11.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px;">${dirTag}</span>
+            </div>
+            <div style="margin-top: 6px; color: #475569; font-size: 12.5px;">Hướng đi: <b style="color: #0f172a;">${b.directionText || b.fleetCode || 'Đang lưu thông'}</b></div>
+            <div style="margin-top: 3px; color: #475569; font-size: 12.5px;">Trạm sắp tới: <b style="color: #0f172a;">${b.nextStation || 'Dọc tuyến'}</b></div>
+            <div style="margin-top: 6px; padding: 6px 10px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; font-weight: 700; color: #ea580c; display: flex; justify-content: space-between;">
+                <span>Cách: ${b.partRemained >= 1000 ? (b.partRemained/1000).toFixed(1) + ' km' : Math.round(b.partRemained || 0) + ' m'}</span>
+                <span>còn ~${Math.max(1, Math.round((b.timeRemained || 0)/60))} phút</span>
+            </div>
+            ${distNotice}
+            <button ontouchend="event.stopPropagation();" onclick="event.stopPropagation(); openDepartureModal('${rawPlate}', '${b.fleet || (currentRoute ? currentRoute.code : '')}', '${(b.nextStation || '').replace(/'/g, "\\'")}', ${b.partRemained || 0}, ${b.lat}, ${b.lng})" 
+                    style="width: 100%; margin-top: 8px; background: #2563eb; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; touch-action: manipulation;">
+                🚀 Canh xe này khi xuất bến
+            </button>
         </div>
     `;
 
+    if (marker.getPopup && marker.getPopup()) {
+        marker.setPopupContent(popupHtml);
+    } else {
+        marker.bindPopup(popupHtml, {
+            offset: [0, -12],
+            autoPan: true,
+            closeButton: true,
+            autoPanPadding: [30, 30]
+        });
+    }
+}
+
+// Helper: Mở popup của marker xe một cách độc lập và tin cậy
+window.openBusMarkerPopup = function(plate) {
+    const rawPlate = String(plate || '').trim();
+    const bus = liveActiveBuses.get(rawPlate);
+    if (bus && bus.marker) {
+        bus.marker.openPopup();
+    }
+};
+
+// Helper: Pan bản đồ tới vị trí xe và mở popup
+window.panToBus = function(plate) {
+    const rawPlate = String(plate || '').trim();
+    const bus = liveActiveBuses.get(rawPlate);
+    if (bus && bus.lat && bus.lng) {
+        map.setView([bus.lat, bus.lng], 16, { animate: true });
+        setTimeout(() => {
+            if (bus.marker) bus.marker.openPopup();
+        }, 200);
+    }
+};
+
+// Helper: Create authentic Bus Marker Pill (Chuẩn giao diện App gốc Tìm Buýt có phân biệt chiều đi/về)
+function createBusMarker(b) {
+    const rawPlate = String(b.plate || '').trim();
+    const isNearest = (b.isNearest === true);
+
     const busIcon = L.divIcon({
         className: 'bus-smooth-marker',
-        html: iconHtml,
-        iconSize: [115, 30],
-        iconAnchor: [57, 15]
+        html: getBusMarkerHtml(b, isNearest),
+        iconSize: isNearest ? [165, 32] : [115, 30],
+        iconAnchor: isNearest ? [82, 16] : [57, 15]
     });
 
-    const m = L.marker([b.lat, b.lng], { icon: busIcon, zIndexOffset: 2500 });
+    const m = L.marker([b.lat, b.lng], { icon: busIcon, zIndexOffset: isNearest ? 9999 : 2500 });
+    
+    // Ràng buộc popup trước khi gắn sự kiện
+    updateBusPopup(m, b);
+
     m.on('click', (e) => {
         if (e && e.originalEvent) {
             e.originalEvent.stopPropagation();
@@ -856,7 +930,7 @@ function createBusMarker(b) {
         L.DomEvent.stopPropagation(e);
         m.openPopup();
     });
-    updateBusPopup(m, b);
+
     return m;
 }
 
@@ -944,13 +1018,20 @@ function renderCurrentDirection() {
         });
 
         const m = L.marker([st.lat, st.lng], { icon: stationIcon });
+        m.on('click', () => {
+            selectStation({ stationId: st.stationId, name: st.name, lat: st.lat, lng: st.lng, direction: currentDirection, order: st.order || (idx + 1) });
+        });
         m.bindPopup(`
-            <div style="font-family: inherit; min-width: 190px;">
+            <div style="font-family: inherit; min-width: 195px;">
                 <div style="font-size: 11px; font-weight: 700; color: #64748b;">Trạm số ${st.order || (idx + 1)}</div>
                 <div style="font-size: 14.5px; font-weight: 800; color: #0f172a; margin-top: 2px;">${st.name || 'Điểm dừng xe buýt'}</div>
                 <div style="font-size: 12px; color: #475569; margin: 4px 0;">${st.address || ''}</div>
+                <button onclick="selectStation({ stationId: ${st.stationId}, name: '${(st.name || '').replace(/'/g, "\\'")}', lat: ${st.lat}, lng: ${st.lng}, direction: '${currentDirection}', order: ${st.order || (idx + 1)} })" 
+                        style="width: 100%; margin-top: 6px; background: #0066cc; color: #fff; border: none; padding: 7px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                    🎯 Chọn trạm & xem xe gần nhất
+                </button>
                 <button onclick="openAlertModalForStation(${st.stationId}, '${(st.name || st.address || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${st.lat}, ${st.lng})" 
-                        style="width: 100%; margin-top: 8px; background: #ea580c; color: #fff; border: none; padding: 7px 10px; border-radius: 6px; font-weight: 700; font-size: 12.5px; cursor: pointer;">
+                        style="width: 100%; margin-top: 6px; background: #ea580c; color: #fff; border: none; padding: 7px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;">
                     🔔 Đặt cảnh báo xe đến đây
                 </button>
             </div>
@@ -964,7 +1045,7 @@ function renderCurrentDirection() {
     stationList.innerHTML = stations.map((st, idx) => {
         const isFav = favList.some(s => s.stationId === st.stationId && (s.direction ? s.direction === currentDirection : true));
         return `
-        <div id="station-item-${st.stationId}" class="station-item ${isFav ? 'is-fav' : ''}" onclick="panToStation(${st.lat}, ${st.lng})">
+        <div id="station-item-${st.stationId}" class="station-item ${isFav ? 'is-fav' : ''}" onclick="selectStation({ stationId: ${st.stationId}, name: '${(st.name || st.address || '').replace(/'/g, "\\'")}', lat: ${st.lat}, lng: ${st.lng}, direction: '${currentDirection}', order: ${st.order || (idx + 1)} })">
             <div class="station-order">${st.order || (idx + 1)}</div>
             <div class="station-info">
                 <div class="station-name">
@@ -1078,10 +1159,10 @@ async function selectStation(st) {
                 });
                 const tempM = L.marker([st.lat, st.lng], { icon: stationIcon, zIndexOffset: 2000 });
                 tempM.bindPopup(`
-                    <div style="font-family: inherit; min-width: 190px;">
+                    <div style="font-family: inherit; min-width: 195px;">
                         <div style="font-size: 15px; font-weight: 800; color: #0066cc;">🚏 ${st.name}</div>
                         <div style="font-size: 12px; color: #475569; margin: 4px 0;">Tuyến đi qua: <b>${st.fleetOver || (currentRoute ? currentRoute.code : '83')}</b></div>
-                        <button onclick="openAlertModalForStation(${st.stationId}, '${st.name.replace(/'/g, "\\'")}', '${currentRoute ? currentRoute.code : ''}', ${st.lat}, ${st.lng})" 
+                        <button onclick="openAlertModalForStation(${st.stationId}, '${(st.name || '').replace(/'/g, "\\'")}', '${currentRoute ? currentRoute.code : ''}', ${st.lat}, ${st.lng})" 
                                 style="width: 100%; margin-top: 8px; background: #ea580c; color: #fff; border: none; padding: 7px 10px; border-radius: 6px; font-weight: 700; font-size: 12.5px; cursor: pointer;">
                             🔔 Đặt cảnh báo xe đến đây
                         </button>
@@ -1092,8 +1173,7 @@ async function selectStation(st) {
         }, 300);
     }
 
-    // 4. Cuộn mượt danh sách điểm dừng tới trạm này và highlight
-    switchTab('tab-stations');
+    // 4. Highlight điểm dừng trong danh sách trạm (nếu mở tab trạm)
     setTimeout(() => {
         const el = document.getElementById(`station-item-${st.stationId}`);
         if (el) {
@@ -1103,7 +1183,10 @@ async function selectStation(st) {
         }
     }, 400);
 
-    // 5. Duy trì realtime xe của tuyến chạy liên tục
+    // 5. Tự động tính khoảng cách, thời gian và highlight xe gần nhất
+    updateStationFocusUI();
+
+    // 6. Duy trì realtime xe của tuyến chạy liên tục
     if (currentRoute) {
         fetchRealtimeBuses();
     } else {
@@ -1119,35 +1202,327 @@ window.panToStation = function(lat, lng) {
     }
 };
 
-// Helper: Render Bus Cards List in Bottom Sheet (Hiển thị phân biệt Chiều đi / Chiều về + Nút Canh xe xuất bến)
+// Tính khoảng cách, ETA và xác định xe gần nhất đối với điểm dừng đang chọn
+function calculateBusesToStation(station) {
+    if (!station || !currentRoute) return { nearestBus: null, approachingBuses: [], targetDir: currentDirection || 'go' };
+
+    const inGo = currentRoute.go && currentRoute.go.stations && currentRoute.go.stations.some(s => s.stationId === station.stationId);
+    const inRet = currentRoute.ret && currentRoute.ret.stations && currentRoute.ret.stations.some(s => s.stationId === station.stationId);
+    let targetDir = station.direction || currentDirection || 'go';
+    if (inRet && !inGo) targetDir = 'ret';
+    else if (inGo && !inRet) targetDir = 'go';
+
+    const isDirGo = (targetDir === 'go');
+    const dirData = isDirGo ? currentRoute.go : currentRoute.ret;
+    const path = dirData ? (dirData.path || []) : [];
+    const stations = dirData ? (dirData.stations || []) : [];
+
+    const targetStation = stations.find(s => s.stationId === station.stationId) || station;
+    const targetStationIdx = stations.findIndex(s => s.stationId === station.stationId);
+    const targetOrder = (typeof targetStation.order === 'number') ? targetStation.order : (targetStationIdx + 1);
+    const targetPathIdx = (path.length > 0 && targetStation.lat && targetStation.lng) 
+        ? findClosestPathIndex(path, targetStation.lat, targetStation.lng) 
+        : -1;
+
+    const approachingBuses = [];
+
+    for (const b of liveActiveBuses.values()) {
+        const busIsGo = (b.isGo !== false);
+        if (busIsGo !== isDirGo) {
+            b.relToStation = { isSameDir: false, hasPassed: false, statusText: 'Chiều ngược lại' };
+            b.isNearest = false;
+            continue;
+        }
+
+        // Xe cùng chiều di chuyển
+        let hasPassed = false;
+
+        // 1. Kiểm tra theo số thứ tự trạm kế tiếp
+        if (b.nextStationId && targetStationIdx !== -1) {
+            const busNextSt = stations.find(s => s.stationId === b.nextStationId);
+            if (busNextSt && typeof busNextSt.order === 'number' && typeof targetOrder === 'number') {
+                if (busNextSt.order > targetOrder) {
+                    hasPassed = true;
+                }
+            }
+        }
+
+        // 2. Kiểm tra theo chỉ số polyline đường đi
+        let busPathIdx = -1;
+        if (path.length > 0 && b.lat && b.lng) {
+            busPathIdx = findClosestPathIndex(path, b.lat, b.lng);
+            if (targetPathIdx !== -1 && busPathIdx > targetPathIdx + 2) {
+                hasPassed = true;
+            }
+        }
+
+        if (hasPassed) {
+            b.relToStation = { isSameDir: true, hasPassed: true, statusText: 'Đã đi qua trạm này' };
+            b.isNearest = false;
+            continue;
+        }
+
+        // Xe ĐANG ĐẾN trạm targetStation: tính khoảng cách dọc theo lộ trình
+        let distMeters = 0;
+        if (b.nextStationId === targetStation.stationId && typeof b.partRemained === 'number' && b.partRemained > 0) {
+            distMeters = b.partRemained;
+        } else if (path.length > 0 && busPathIdx !== -1 && targetPathIdx !== -1) {
+            if (busPathIdx >= targetPathIdx) {
+                distMeters = getDistance(b.lat, b.lng, targetStation.lat, targetStation.lng);
+            } else {
+                distMeters = getDistance(b.lat, b.lng, path[busPathIdx][0], path[busPathIdx][1]);
+                for (let i = busPathIdx; i < targetPathIdx; i++) {
+                    distMeters += getDistance(path[i][0], path[i][1], path[i + 1][0], path[i + 1][1]);
+                }
+                distMeters += getDistance(path[targetPathIdx][0], path[targetPathIdx][1], targetStation.lat, targetStation.lng);
+            }
+        } else if (b.lat && b.lng && targetStation.lat && targetStation.lng) {
+            distMeters = getDistance(b.lat, b.lng, targetStation.lat, targetStation.lng);
+        }
+
+        distMeters = Math.max(10, Math.round(distMeters));
+        const speedKmh = (b.speed && b.speed > 5) ? b.speed : 25;
+        const speedMps = Math.max(3.5, speedKmh * 1000 / 3600);
+        const timeSeconds = Math.round(distMeters / speedMps);
+        const etaMinutes = Math.max(1, Math.round(timeSeconds / 60));
+
+        b.relToStation = {
+            isSameDir: true,
+            hasPassed: false,
+            distanceMeters: distMeters,
+            timeSeconds: timeSeconds,
+            etaMinutes: etaMinutes,
+            speedKmh: Math.round(speedKmh)
+        };
+        b.isNearest = false;
+        approachingBuses.push(b);
+    }
+
+    // Sắp xếp các xe đang đến gần nhất lên đầu
+    approachingBuses.sort((a, b) => a.relToStation.distanceMeters - b.relToStation.distanceMeters);
+
+    let nearestBus = null;
+    if (approachingBuses.length > 0) {
+        nearestBus = approachingBuses[0];
+        nearestBus.isNearest = true;
+    }
+
+    return { nearestBus, approachingBuses, targetDir };
+}
+
+// Cập nhật giao diện Focus Điểm Dừng & Highlight xe gần nhất
+function updateStationFocusUI() {
+    if (!currentStation || !currentRoute) {
+        const card = document.getElementById('station-focus-card');
+        if (card) card.style.display = 'none';
+        return;
+    }
+
+    const { nearestBus, approachingBuses, targetDir } = calculateBusesToStation(currentStation);
+
+    const card = document.getElementById('station-focus-card');
+    const nameEl = document.getElementById('station-focus-name');
+    const dirEl = document.getElementById('station-focus-dir');
+    const routeTagEl = document.getElementById('station-focus-route-tag');
+    const contentEl = document.getElementById('station-focus-content');
+
+    if (card && nameEl && dirEl && contentEl) {
+        card.style.display = 'block';
+        nameEl.innerText = currentStation.name || 'Điểm dừng đã chọn';
+        nameEl.title = currentStation.name || '';
+
+        const isGo = (targetDir === 'go');
+        dirEl.className = `dir-pill ${isGo ? 'pill-go' : 'pill-ret'}`;
+        dirEl.innerText = isGo ? 'Chiều đi' : 'Chiều về';
+        if (routeTagEl) {
+            routeTagEl.innerText = `Tuyến ${currentRoute.code}`;
+        }
+
+        if (nearestBus) {
+            const dText = nearestBus.relToStation.distanceMeters >= 1000 
+                ? (nearestBus.relToStation.distanceMeters / 1000).toFixed(1) + ' km' 
+                : nearestBus.relToStation.distanceMeters + ' m';
+            const tText = (nearestBus.relToStation.distanceMeters <= 50) 
+                ? 'Đang tới trạm' 
+                : `~${nearestBus.relToStation.etaMinutes} phút`;
+
+            let nextBusHint = '';
+            if (approachingBuses.length > 1) {
+                const nextBus = approachingBuses[1];
+                const nextDText = nextBus.relToStation.distanceMeters >= 1000 
+                    ? (nextBus.relToStation.distanceMeters / 1000).toFixed(1) + ' km' 
+                    : nextBus.relToStation.distanceMeters + ' m';
+                nextBusHint = `<div class="next-bus-hint">Xe tiếp theo: <b>${nextBus.plate}</b> (cách ${nextDText}, ~${nextBus.relToStation.etaMinutes} phút)</div>`;
+            }
+
+            contentEl.innerHTML = `
+                <div class="station-nearest-box">
+                    <div class="nearest-bus-header">
+                        <span class="nearest-badge">⭐ XE GẦN NHẤT ĐANG TỚI</span>
+                        <span class="nearest-plate">🚌 ${nearestBus.plate}</span>
+                    </div>
+                    <div class="nearest-bus-metrics">
+                        <div class="metric-item">
+                            <span class="metric-label">Khoảng cách</span>
+                            <span class="metric-value dist-highlight">${dText}</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Thời gian đến</span>
+                            <span class="metric-value time-highlight">${tText}</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Vận tốc</span>
+                            <span class="metric-value">${nearestBus.relToStation.speedKmh} km/h</span>
+                        </div>
+                    </div>
+                    ${nextBusHint}
+                    <div class="nearest-bus-actions">
+                        <button class="btn-focus-action btn-locate-bus" onclick="panToBus('${nearestBus.plate}')" title="Xem xe trên bản đồ">
+                            🎯 Xem xe này
+                        </button>
+                        <button class="btn-focus-action btn-alert-bus" onclick="openAlertModalForStation(${currentStation.stationId}, '${(currentStation.name || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${currentStation.lat}, ${currentStation.lng})" title="Đặt chuông báo khi xe tới">
+                            🔔 Báo xe đến
+                        </button>
+                        <button class="btn-focus-action btn-departure-bus" onclick="openDepartureModal('${nearestBus.plate}', '${currentRoute.code}', '${(nearestBus.nextStation || '').replace(/'/g, "\\'")}', ${nearestBus.partRemained || 0}, ${nearestBus.lat}, ${nearestBus.lng})" title="Canh xe xuất bến / di chuyển">
+                            🚀 Canh xe
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            contentEl.innerHTML = `
+                <div class="station-no-bus">
+                    <span>⚠️ Chưa phát hiện xe nào đang di chuyển tới trạm này ở <b>${isGo ? 'Chiều đi' : 'Chiều về'}</b>.</span>
+                    <button class="btn-focus-action btn-alert-bus" style="padding: 6px 10px; flex-shrink: 0;" onclick="openAlertModalForStation(${currentStation.stationId}, '${(currentStation.name || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${currentStation.lat}, ${currentStation.lng})">
+                        🔔 Báo khi có xe
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    // Cập nhật marker trên Leaflet map (phóng to, viền phát sáng, tăng zIndex cho xe gần nhất)
+    for (const b of liveActiveBuses.values()) {
+        if (!b.marker) continue;
+        const isNearest = (b === nearestBus);
+        const busIcon = L.divIcon({
+            className: 'bus-smooth-marker',
+            html: getBusMarkerHtml(b, isNearest),
+            iconSize: isNearest ? [165, 32] : [115, 30],
+            iconAnchor: isNearest ? [82, 16] : [57, 15]
+        });
+        b.marker.setIcon(busIcon);
+        b.marker.setZIndexOffset(isNearest ? 9999 : 2500);
+        updateBusPopup(b.marker, b);
+    }
+
+    // Cập nhật danh sách "Xe đang chạy" trong bottom sheet
+    renderBusCardsList(Array.from(liveActiveBuses.values()));
+}
+
+// Hủy chọn trạm
+window.clearStationFocus = function() {
+    currentStation = null;
+    const card = document.getElementById('station-focus-card');
+    if (card) card.style.display = 'none';
+
+    liveActiveBuses.forEach(b => {
+        b.relToStation = null;
+        b.isNearest = false;
+        if (b.marker) {
+            const busIcon = L.divIcon({
+                className: 'bus-smooth-marker',
+                html: getBusMarkerHtml(b, false),
+                iconSize: [115, 30],
+                iconAnchor: [57, 15]
+            });
+            b.marker.setIcon(busIcon);
+            b.marker.setZIndexOffset(2500);
+            updateBusPopup(b.marker, b);
+        }
+    });
+
+    renderBusCardsList(Array.from(liveActiveBuses.values()));
+};
+
+// Helper: Render Bus Cards List in Bottom Sheet (Hiển thị phân biệt Chiều đi / Chiều về + Nút Canh xe xuất bến + Ưu tiên xe gần trạm)
 function renderBusCardsList(allBuses) {
     if (!allBuses || allBuses.length === 0) {
         realtimeBusList.innerHTML = `<div class="empty-hint">Hiện chưa quét được xe buýt nào đang gửi tín hiệu GPS. Hệ thống đang tiếp tục quét mỗi 4 giây...</div>`;
         return;
     }
 
-    realtimeBusList.innerHTML = allBuses.map(b => {
+    let sortedBuses = [...allBuses];
+    if (currentStation) {
+        sortedBuses.sort((a, b) => {
+            const aApp = a.relToStation && a.relToStation.isSameDir && !a.relToStation.hasPassed;
+            const bApp = b.relToStation && b.relToStation.isSameDir && !b.relToStation.hasPassed;
+            if (aApp && !bApp) return -1;
+            if (!aApp && bApp) return 1;
+            if (aApp && bApp) {
+                return (a.relToStation.distanceMeters || 0) - (b.relToStation.distanceMeters || 0);
+            }
+            return 0;
+        });
+    }
+
+    realtimeBusList.innerHTML = sortedBuses.map(b => {
         const isGo = b.isGo !== false;
         const dirClass = isGo ? 'pill-go' : 'pill-ret';
         const dirLabel = isGo ? '➜ Chiều đi' : '⬅ Chiều về';
+        const isNearest = (b.isNearest === true);
+
+        let proximityHtml = `
+            <div class="bus-proximity-stats" style="text-align: right;">
+                <div class="bus-distance">${b.partRemained >= 1000 ? (b.partRemained/1000).toFixed(1) + ' km' : Math.round(b.partRemained || 0) + ' m'}</div>
+                <div class="bus-eta">còn ~${Math.max(1, Math.round((b.timeRemained || 0)/60))} phút</div>
+            </div>
+        `;
+
+        if (currentStation && b.relToStation) {
+            if (b.relToStation.isSameDir) {
+                if (b.relToStation.hasPassed) {
+                    proximityHtml = `
+                        <div class="bus-proximity-stats" style="text-align: right;">
+                            <div style="font-size: 11px; color: #dc2626; font-weight: 700;">Đã qua trạm này</div>
+                        </div>
+                    `;
+                } else {
+                    const dText = b.relToStation.distanceMeters >= 1000 
+                        ? (b.relToStation.distanceMeters / 1000).toFixed(1) + ' km' 
+                        : b.relToStation.distanceMeters + ' m';
+                    proximityHtml = `
+                        <div class="bus-proximity-stats" style="text-align: right;">
+                            <div class="bus-distance" style="color: ${isNearest ? '#d97706' : '#2563eb'}; font-size: 14px;">${dText}</div>
+                            <div class="bus-eta" style="font-weight: 700;">~${b.relToStation.etaMinutes} phút</div>
+                        </div>
+                    `;
+                }
+            } else {
+                proximityHtml = `
+                    <div class="bus-proximity-stats" style="text-align: right;">
+                        <div style="font-size: 11px; color: #64748b; font-weight: 600;">Chiều ngược lại</div>
+                    </div>
+                `;
+            }
+        }
+
         return `
-            <div class="bus-card" onclick="panToStation(${b.lat}, ${b.lng})">
+            <div class="bus-card ${isNearest ? 'bus-card-nearest' : ''}" onclick="panToStation(${b.lat}, ${b.lng})">
                 <div class="bus-plate-wrap">
-                    <div class="bus-plate-icon">${getBusSvgIcon(isGo ? '#0284c7' : '#ea580c', 22)}</div>
+                    <div class="bus-plate-icon">${getBusSvgIcon(isNearest ? '#d97706' : (isGo ? '#0284c7' : '#ea580c'), 22)}</div>
                     <div>
-                        <div class="bus-plate-title" style="display:flex; align-items:center; gap:6px;">
+                        <div class="bus-plate-title" style="display:flex; align-items:center; gap:6px; flex-wrap: wrap;">
                             <span>${b.plate}</span>
                             <span class="dir-pill ${dirClass}">${dirLabel}</span>
+                            ${isNearest ? '<span class="bus-card-nearest-badge">⭐ XE GẦN NHẤT</span>' : ''}
                         </div>
                         <div class="bus-route-direction">${b.directionText || b.fleetCode || ('Tuyến ' + b.fleet)}</div>
-                        <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Trạm: ${b.nextStation || 'Dọc tuyến'}</div>
+                        <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Trạm tiếp theo: ${b.nextStation || 'Dọc tuyến'}</div>
                     </div>
                 </div>
                 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                    <div class="bus-proximity-stats" style="text-align: right;">
-                        <div class="bus-distance">${b.partRemained >= 1000 ? (b.partRemained/1000).toFixed(1) + ' km' : Math.round(b.partRemained || 0) + ' m'}</div>
-                        <div class="bus-eta">còn ~${Math.max(1, Math.round((b.timeRemained || 0)/60))} phút</div>
-                    </div>
+                    ${proximityHtml}
                     <button class="btn-bus-departure" onclick="event.stopPropagation(); openDepartureModal('${b.plate}', '${b.fleet || (currentRoute ? currentRoute.code : '')}', '${(b.nextStation || 'Bến xe').replace(/'/g, "\\'")}', ${b.partRemained || 0}, ${b.lat}, ${b.lng})">
                         🚀 Canh xe chạy
                     </button>
@@ -1199,6 +1574,11 @@ function tickRealtimeBusesEverySecond() {
 
         // Kiểm tra điều kiện xe đến gần trạm cảnh báo (mỗi giây)
         checkProximityAlertLocal(b);
+    }
+
+    // Tự động cập nhật khoảng cách & thời gian đếm lùi tới trạm đang chọn mỗi giây
+    if (currentStation) {
+        updateStationFocusUI();
     }
 }
 
@@ -1275,7 +1655,11 @@ async function fetchRealtimeBuses() {
             }
         }
 
-        renderBusCardsList(Array.from(liveActiveBuses.values()));
+        if (currentStation) {
+            updateStationFocusUI();
+        } else {
+            renderBusCardsList(Array.from(liveActiveBuses.values()));
+        }
 
     } catch (e) {
         console.warn('Realtime fetch failed:', e);
@@ -1326,7 +1710,11 @@ async function fetchRealtimeStationBuses() {
             }
         }
 
-        renderBusCardsList(Array.from(liveActiveBuses.values()));
+        if (currentStation) {
+            updateStationFocusUI();
+        } else {
+            renderBusCardsList(Array.from(liveActiveBuses.values()));
+        }
 
     } catch (e) {
         console.warn('Station buses fetch failed:', e);
@@ -1800,6 +2188,12 @@ btnCloseToast.addEventListener('click', () => {
     locationHintToast.style.display = 'none';
 });
 
+if (btnCloseStationFocus) {
+    btnCloseStationFocus.addEventListener('click', () => {
+        clearStationFocus();
+    });
+}
+
 function handleManualLocationPick(lat, lng) {
     setUserPosition(lat, lng, 20);
     locationHintToast.style.display = 'none';
@@ -1894,7 +2288,7 @@ function showLoading(show, text = 'Đang tải...') {
 // ==========================================
 // 4. AUTO-UPDATE APP ENGINE (Tự động cập nhật & Bảo lưu 100% dữ liệu)
 // ==========================================
-const APP_CURRENT_VERSION = '1.2.3';
+const APP_CURRENT_VERSION = '1.2.4';
 const DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/tuanleanh89/timbus_promax/main/version.json';
 
 const btnCheckUpdate = document.getElementById('btn-check-update');
@@ -2094,6 +2488,7 @@ if (brandHomeBtn) {
 }
 
 function resetToHome() {
+    clearStationFocus();
     searchInput.value = '';
     clearSearchBtn.style.display = 'none';
     searchDropdown.style.display = 'none';
