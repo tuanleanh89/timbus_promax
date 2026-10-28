@@ -234,6 +234,41 @@ const btnTestAlertSound = document.getElementById('btn-test-alert-sound');
 
 let pendingAlert = null;
 let searchDebounce = null;
+let currentTileLayer = null;
+let currentTileType = 'google_roadmap'; // 'google_roadmap' (Google Maps chuẩn), 'google_hybrid' (Vệ tinh), 'osm' (OpenStreetMap)
+
+// Chuyển đổi linh hoạt giữa Google Maps và các bản đồ khác
+function setMapTileLayer(type) {
+    if (!map) return;
+    if (currentTileLayer) {
+        map.removeLayer(currentTileLayer);
+    }
+    currentTileType = type;
+
+    if (type === 'google_roadmap') {
+        currentTileLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['0', '1', '2', '3'],
+            attribution: '© Google Maps'
+        }).addTo(map);
+    } else if (type === 'google_hybrid') {
+        currentTileLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['0', '1', '2', '3'],
+            attribution: '© Google Maps Satellite'
+        }).addTo(map);
+    } else {
+        currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            subdomains: ['a', 'b', 'c'],
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+    }
+
+    if (currentTileLayer && currentTileLayer.bringToBack) {
+        currentTileLayer.bringToBack();
+    }
+}
 
 // Initialize Map
 function initMap() {
@@ -242,10 +277,8 @@ function initMap() {
         attributionControl: false
     }).setView([21.028511, 105.854167], 13);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        subdomains: ['a', 'b', 'c']
-    }).addTo(map);
+    // Mặc định nạp Google Maps sắc nét, đường phố tiếng Việt chuẩn và tải siêu nhẹ/nhanh tại VN
+    setMapTileLayer('google_roadmap');
 
     stationMarkersLayer = L.layerGroup().addTo(map);
     arrowMarkersLayer = L.layerGroup().addTo(map);
@@ -1202,6 +1235,24 @@ window.panToStation = function(lat, lng) {
     }
 };
 
+let isFocusCardCollapsed = false;
+let isAlertBannerCollapsed = false;
+let isDepartureBannerCollapsed = false;
+
+// Áp dụng trạng thái thu gọn / mở rộng của thẻ tiêu điểm trạm dừng
+function applyFocusCardCollapsedState() {
+    const card = document.getElementById('station-focus-card');
+    const toggleFocusText = document.getElementById('toggle-focus-text');
+    if (!card) return;
+    if (isFocusCardCollapsed) {
+        card.classList.add('is-collapsed');
+        if (toggleFocusText) toggleFocusText.innerText = '▼ Mở rộng';
+    } else {
+        card.classList.remove('is-collapsed');
+        if (toggleFocusText) toggleFocusText.innerText = '▲ Thu gọn';
+    }
+}
+
 // Tính khoảng cách, ETA và xác định xe gần nhất đối với điểm dừng đang chọn
 function calculateBusesToStation(station) {
     if (!station || !currentRoute) return { nearestBus: null, approachingBuses: [], targetDir: currentDirection || 'go' };
@@ -1247,18 +1298,37 @@ function calculateBusesToStation(station) {
             }
         }
 
-        // 2. Kiểm tra theo chỉ số polyline đường đi
+        // 2. Kiểm tra theo chỉ số polyline đường đi: Nếu đã vượt qua vị trí trạm trên polyline -> Đã đi qua!
         let busPathIdx = -1;
         if (path.length > 0 && b.lat && b.lng) {
             busPathIdx = findClosestPathIndex(path, b.lat, b.lng);
-            if (targetPathIdx !== -1 && busPathIdx > targetPathIdx + 2) {
+            if (targetPathIdx !== -1 && busPathIdx > targetPathIdx) {
                 hasPassed = true;
             }
         }
 
+        // 3. Nếu khoảng cách thực tế giữa xe và trạm rất gần (<= 25m) và xe đã ở cuối phân đoạn trạm -> Đã qua!
+        if (!hasPassed && b.lat && b.lng && targetStation.lat && targetStation.lng) {
+            const directDist = getDistance(b.lat, b.lng, targetStation.lat, targetStation.lng);
+            if (directDist <= 25 && targetPathIdx !== -1 && busPathIdx >= targetPathIdx) {
+                hasPassed = true;
+            }
+        }
+
+        // KHI XE ĐÃ QUA ĐIỂM DỪNG: Bỏ chọn canh xe & highlight của xe này ngay lập tức!
         if (hasPassed) {
             b.relToStation = { isSameDir: true, hasPassed: true, statusText: 'Đã đi qua trạm này' };
             b.isNearest = false;
+
+            // Xóa bỏ trạng thái canh xe cũ nếu xe này vừa đi qua
+            if (activeDepartureAlert && activeDepartureAlert.plate === b.plate) {
+                stopDepartureAlert();
+            }
+            if (activeAlert && activeAlert.lastNotifiedPlate === b.plate) {
+                activeAlert.lastNotifiedPlate = null;
+                const bannerStatus = document.getElementById('alert-banner-status');
+                if (bannerStatus) bannerStatus.innerText = 'Đang quét xe tiếp theo đang tới...';
+            }
             continue;
         }
 
@@ -1310,7 +1380,7 @@ function calculateBusesToStation(station) {
     return { nearestBus, approachingBuses, targetDir };
 }
 
-// Cập nhật giao diện Focus Điểm Dừng & Highlight xe gần nhất
+// Cập nhật giao diện Focus Điểm Dừng & Highlight xe gần nhất (Có thu gọn/tối giản & chống đè lặp)
 function updateStationFocusUI() {
     if (!currentStation || !currentRoute) {
         const card = document.getElementById('station-focus-card');
@@ -1324,11 +1394,24 @@ function updateStationFocusUI() {
     const nameEl = document.getElementById('station-focus-name');
     const dirEl = document.getElementById('station-focus-dir');
     const routeTagEl = document.getElementById('station-focus-route-tag');
+    const miniSummaryEl = document.getElementById('station-focus-mini-summary');
     const contentEl = document.getElementById('station-focus-content');
+
+    // Kiểm tra xem có đang bật cảnh báo cho trạm này không
+    const isAlertingCurrentStation = Boolean(activeAlert && currentStation && (activeAlert.stationId === currentStation.stationId || activeAlert.stationName === currentStation.name));
+
+    // TỐI GIẢN: Nếu đang bật báo cho chính trạm này, ẩn thanh cảnh báo vàng riêng biệt đi để tránh trùng lặp đè lên nhau
+    const alertBannerEl = document.getElementById('alert-banner');
+    if (isAlertingCurrentStation && alertBannerEl) {
+        alertBannerEl.style.display = 'none';
+    }
 
     if (card && nameEl && dirEl && contentEl) {
         card.style.display = 'block';
-        nameEl.innerText = currentStation.name || 'Điểm dừng đã chọn';
+        applyFocusCardCollapsedState();
+
+        const cleanStationName = (currentStation.name || 'Điểm dừng').replace(/^[0-9A-Z\(\)\s,-]+ - /, '') || currentStation.name;
+        nameEl.innerText = cleanStationName;
         nameEl.title = currentStation.name || '';
 
         const isGo = (targetDir === 'go');
@@ -1346,6 +1429,10 @@ function updateStationFocusUI() {
                 ? 'Đang tới trạm' 
                 : `~${nearestBus.relToStation.etaMinutes} phút`;
 
+            if (miniSummaryEl) {
+                miniSummaryEl.innerText = `⭐ ${nearestBus.plate} • ${dText} (~${nearestBus.relToStation.etaMinutes}p)`;
+            }
+
             let nextBusHint = '';
             if (approachingBuses.length > 1) {
                 const nextBus = approachingBuses[1];
@@ -1355,11 +1442,25 @@ function updateStationFocusUI() {
                 nextBusHint = `<div class="next-bus-hint">Xe tiếp theo: <b>${nextBus.plate}</b> (cách ${nextDText}, ~${nextBus.relToStation.etaMinutes} phút)</div>`;
             }
 
+            // Nút báo xe linh hoạt: Nếu đang báo thì hiện nút Tắt báo, nếu chưa báo thì hiện nút Báo xe đến
+            const alertBtnHtml = isAlertingCurrentStation ? `
+                <button class="btn-focus-action btn-alert-bus" style="background: #475569;" onclick="stopStationAlert()" title="Tắt cảnh báo xe đến trạm này">
+                    🔕 Tắt báo
+                </button>
+            ` : `
+                <button class="btn-focus-action btn-alert-bus" onclick="openAlertModalForStation(${currentStation.stationId}, '${(currentStation.name || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${currentStation.lat}, ${currentStation.lng})" title="Đặt chuông báo khi xe tới">
+                    🔔 Báo xe đến
+                </button>
+            `;
+
             contentEl.innerHTML = `
                 <div class="station-nearest-box">
                     <div class="nearest-bus-header">
                         <span class="nearest-badge">⭐ XE GẦN NHẤT ĐANG TỚI</span>
-                        <span class="nearest-plate">🚌 ${nearestBus.plate}</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            ${isAlertingCurrentStation ? '<span style="background:#ea580c; color:#fff; font-size:10.5px; font-weight:800; padding:2px 6px; border-radius:5px;">🔔 Đang canh</span>' : ''}
+                            <span class="nearest-plate">🚌 ${nearestBus.plate}</span>
+                        </div>
                     </div>
                     <div class="nearest-bus-metrics">
                         <div class="metric-item">
@@ -1380,9 +1481,7 @@ function updateStationFocusUI() {
                         <button class="btn-focus-action btn-locate-bus" onclick="panToBus('${nearestBus.plate}')" title="Xem xe trên bản đồ">
                             🎯 Xem xe này
                         </button>
-                        <button class="btn-focus-action btn-alert-bus" onclick="openAlertModalForStation(${currentStation.stationId}, '${(currentStation.name || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${currentStation.lat}, ${currentStation.lng})" title="Đặt chuông báo khi xe tới">
-                            🔔 Báo xe đến
-                        </button>
+                        ${alertBtnHtml}
                         <button class="btn-focus-action btn-departure-bus" onclick="openDepartureModal('${nearestBus.plate}', '${currentRoute.code}', '${(nearestBus.nextStation || '').replace(/'/g, "\\'")}', ${nearestBus.partRemained || 0}, ${nearestBus.lat}, ${nearestBus.lng})" title="Canh xe xuất bến / di chuyển">
                             🚀 Canh xe
                         </button>
@@ -1390,9 +1489,12 @@ function updateStationFocusUI() {
                 </div>
             `;
         } else {
+            if (miniSummaryEl) {
+                miniSummaryEl.innerText = `⚠️ Chưa có xe đang đến`;
+            }
             contentEl.innerHTML = `
                 <div class="station-no-bus">
-                    <span>⚠️ Chưa phát hiện xe nào đang di chuyển tới trạm này ở <b>${isGo ? 'Chiều đi' : 'Chiều về'}</b>.</span>
+                    <span>⚠️ Chưa phát hiện thêm xe nào đang di chuyển tới trạm này ở <b>${isGo ? 'Chiều đi' : 'Chiều về'}</b>.</span>
                     <button class="btn-focus-action btn-alert-bus" style="padding: 6px 10px; flex-shrink: 0;" onclick="openAlertModalForStation(${currentStation.stationId}, '${(currentStation.name || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${currentStation.lat}, ${currentStation.lng})">
                         🔔 Báo khi có xe
                     </button>
@@ -1419,6 +1521,15 @@ function updateStationFocusUI() {
     // Cập nhật danh sách "Xe đang chạy" trong bottom sheet
     renderBusCardsList(Array.from(liveActiveBuses.values()));
 }
+
+// Dừng cảnh báo điểm dừng
+window.stopStationAlert = function() {
+    activeAlert = null;
+    const alertBannerEl = document.getElementById('alert-banner');
+    if (alertBannerEl) alertBannerEl.style.display = 'none';
+    stopPhoneRingtone();
+    updateStationFocusUI();
+};
 
 // Hủy chọn trạm
 window.clearStationFocus = function() {
@@ -1814,8 +1925,14 @@ btnActivateAlert.addEventListener('click', () => {
 
     alertModal.style.display = 'none';
 
-    // Show Alert Banner
-    alertBanner.style.display = 'flex';
+    const isAlertingCur = Boolean(currentStation && (activeAlert.stationId === currentStation.stationId || activeAlert.stationName === currentStation.name));
+    if (isAlertingCur) {
+        alertBanner.style.display = 'none';
+    } else {
+        alertBanner.style.display = 'flex';
+    }
+    updateStationFocusUI();
+
     const dirTag = activeAlert.isGo === true ? ' [Chiều đi]' : (activeAlert.isGo === false ? ' [Chiều về]' : '');
     alertBannerStation.innerText = `Đang canh xe ${activeAlert.routeCode ? 'Tuyến ' + activeAlert.routeCode : ''}${dirTag} tại: ${activeAlert.stationName}`;
     alertBannerStatus.innerText = `Cảnh báo khi xe cùng chiều cách < ${activeAlert.maxDistance >= 1000 ? (activeAlert.maxDistance/1000) + 'km' : activeAlert.maxDistance + 'm'}`;
@@ -1827,11 +1944,7 @@ btnActivateAlert.addEventListener('click', () => {
     checkStationAlert();
 });
 
-btnStopAlert.addEventListener('click', () => {
-    activeAlert = null;
-    alertBanner.style.display = 'none';
-    stopPhoneRingtone();
-});
+btnStopAlert.addEventListener('click', stopStationAlert);
 
 // Kiểm tra điều kiện xe buýt đến gần trạm cảnh báo (chạy mỗi giây trực tiếp trên client)
 function checkProximityAlertLocal(b) {
@@ -1857,7 +1970,12 @@ function checkProximityAlertLocal(b) {
     }
 
     let distMeters = Infinity;
-    if (b.nextStationId === activeAlert.stationId && typeof b.partRemained === 'number') {
+    if (b.relToStation && b.relToStation.isSameDir) {
+        if (b.relToStation.hasPassed) return;
+        if (typeof b.relToStation.distanceMeters === 'number') {
+            distMeters = b.relToStation.distanceMeters;
+        }
+    } else if (b.nextStationId === activeAlert.stationId && typeof b.partRemained === 'number') {
         distMeters = b.partRemained;
     } else if (b.lat && b.lng && activeAlert.stationLat && activeAlert.stationLng) {
         distMeters = getDistance(b.lat, b.lng, activeAlert.stationLat, activeAlert.stationLng);
@@ -2083,12 +2201,14 @@ if (btnActivateDeparture) {
     });
 }
 
+window.stopDepartureAlert = function() {
+    activeDepartureAlert = null;
+    if (departureBanner) departureBanner.style.display = 'none';
+    stopPhoneRingtone();
+};
+
 if (btnStopDeparture) {
-    btnStopDeparture.addEventListener('click', () => {
-        activeDepartureAlert = null;
-        if (departureBanner) departureBanner.style.display = 'none';
-        stopPhoneRingtone();
-    });
+    btnStopDeparture.addEventListener('click', stopDepartureAlert);
 }
 
 if (btnAcceptCall) {
@@ -2240,6 +2360,74 @@ document.getElementById('btn-refresh-realtime').addEventListener('click', () => 
     }
 });
 
+// Đổi giao diện bản đồ (Google Maps đường sá chuẩn / Vệ tinh / OpenStreetMap)
+const btnToggleMapLayer = document.getElementById('btn-toggle-map-layer');
+if (btnToggleMapLayer) {
+    btnToggleMapLayer.addEventListener('click', () => {
+        if (currentTileType === 'google_roadmap') {
+            setMapTileLayer('google_hybrid');
+            if (locationHintToast) {
+                locationHintToast.querySelector('span').innerHTML = '🗺️ <b>Bản đồ: Google Maps Vệ tinh</b>';
+                locationHintToast.style.display = 'flex';
+                setTimeout(() => { locationHintToast.style.display = 'none'; }, 2000);
+            }
+        } else if (currentTileType === 'google_hybrid') {
+            setMapTileLayer('osm');
+            if (locationHintToast) {
+                locationHintToast.querySelector('span').innerHTML = '🗺️ <b>Bản đồ: OpenStreetMap</b>';
+                locationHintToast.style.display = 'flex';
+                setTimeout(() => { locationHintToast.style.display = 'none'; }, 2000);
+            }
+        } else {
+            setMapTileLayer('google_roadmap');
+            if (locationHintToast) {
+                locationHintToast.querySelector('span').innerHTML = '🗺️ <b>Bản đồ: Google Maps (Chuẩn sắc nét & siêu nhẹ)</b>';
+                locationHintToast.style.display = 'flex';
+                setTimeout(() => { locationHintToast.style.display = 'none'; }, 2000);
+            }
+        }
+    });
+}
+
+// Nút thu gọn / mở rộng cửa sổ xe gần nhất
+const btnToggleFocusCard = document.getElementById('btn-toggle-focus-card');
+if (btnToggleFocusCard) {
+    btnToggleFocusCard.addEventListener('click', (e) => {
+        e.stopPropagation();
+        isFocusCardCollapsed = !isFocusCardCollapsed;
+        applyFocusCardCollapsedState();
+    });
+}
+
+// Cho phép click vào thanh tiêu đề xe gần nhất để thu gọn/mở rộng nhanh
+const stationFocusTitleWrap = document.getElementById('station-focus-title-wrap');
+if (stationFocusTitleWrap) {
+    stationFocusTitleWrap.addEventListener('click', () => {
+        isFocusCardCollapsed = !isFocusCardCollapsed;
+        applyFocusCardCollapsedState();
+    });
+}
+
+// Nút thu gọn / mở rộng dải cảnh báo
+const btnToggleAlertBanner = document.getElementById('btn-toggle-alert-banner');
+if (btnToggleAlertBanner) {
+    btnToggleAlertBanner.addEventListener('click', () => {
+        isAlertBannerCollapsed = !isAlertBannerCollapsed;
+        alertBanner.classList.toggle('is-collapsed', isAlertBannerCollapsed);
+        btnToggleAlertBanner.innerText = isAlertBannerCollapsed ? '▼' : '▲';
+    });
+}
+
+// Nút thu gọn / mở rộng dải canh xe xuất bến
+const btnToggleDepBanner = document.getElementById('btn-toggle-departure-banner');
+if (btnToggleDepBanner) {
+    btnToggleDepBanner.addEventListener('click', () => {
+        isDepartureBannerCollapsed = !isDepartureBannerCollapsed;
+        if (departureBanner) departureBanner.classList.toggle('is-collapsed', isDepartureBannerCollapsed);
+        btnToggleDepBanner.innerText = isDepartureBannerCollapsed ? '▼' : '▲';
+    });
+}
+
 function switchTab(tabId) {
     sheetTabs.forEach(t => t.classList.remove('active'));
     tabBuses.classList.remove('active');
@@ -2288,7 +2476,7 @@ function showLoading(show, text = 'Đang tải...') {
 // ==========================================
 // 4. AUTO-UPDATE APP ENGINE (Tự động cập nhật & Bảo lưu 100% dữ liệu)
 // ==========================================
-const APP_CURRENT_VERSION = '1.2.4';
+const APP_CURRENT_VERSION = '1.2.5';
 const DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/tuanleanh89/timbus_promax/main/version.json';
 
 const btnCheckUpdate = document.getElementById('btn-check-update');

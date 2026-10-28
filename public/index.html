@@ -37,7 +37,7 @@
                 <div class="brand-actions">
                     <button id="btn-check-update" class="btn-check-update" title="Kiểm tra bản cập nhật mới nhất">
                         <span id="update-icon" class="update-icon">🔄</span>
-                        <span id="update-text" class="update-text">v1.2.4</span>
+                        <span id="update-text" class="update-text">v1.2.5</span>
                     </button>
                     <button id="btn-toggle-top-controls" class="btn-toggle-top-controls" title="Ẩn/hiện ô tìm kiếm & thông tin tuyến để mở rộng bản đồ">
                         <span id="toggle-top-icon">▲</span>
@@ -95,7 +95,10 @@
                 <div class="alert-station-name" id="alert-banner-station">Chưa chọn trạm</div>
                 <div class="alert-status-text" id="alert-banner-status">Đang quét xe đến gần...</div>
             </div>
-            <button id="btn-stop-alert" class="alert-stop-btn">Tắt báo</button>
+            <div class="alert-actions-group">
+                <button id="btn-toggle-alert-banner" class="alert-min-btn" title="Thu gọn/Mở rộng cảnh báo">▲</button>
+                <button id="btn-stop-alert" class="alert-stop-btn">Tắt báo</button>
+            </div>
         </div>
 
         <!-- Departure Alert Active Banner (Canh xe xuất bến) -->
@@ -105,23 +108,32 @@
                 <div class="alert-station-name" id="departure-banner-title">Đang canh xe xuất bến</div>
                 <div class="alert-status-text" id="departure-banner-status">Khi xe bắt đầu di chuyển sẽ đổ chuông & gọi...</div>
             </div>
-            <button id="btn-stop-departure" class="alert-stop-btn">Hủy canh</button>
+            <div class="alert-actions-group">
+                <button id="btn-toggle-departure-banner" class="alert-min-btn" title="Thu gọn/Mở rộng canh xe">▲</button>
+                <button id="btn-stop-departure" class="alert-stop-btn">Hủy canh</button>
+            </div>
         </div>
 
-        <!-- Station Focus Card (Tự động tính khoảng cách, ETA & Highlight xe gần nhất) -->
+        <!-- Station Focus Card (Tự động tính khoảng cách, ETA & Highlight xe gần nhất - Có thu gọn/mở rộng tối giản) -->
         <div id="station-focus-card" class="station-focus-card" style="display: none;">
             <div class="station-focus-header">
-                <div class="station-focus-title">
+                <div class="station-focus-title" id="station-focus-title-wrap">
                     <span class="station-focus-icon">🚏</span>
                     <div class="station-focus-texts">
                         <div class="station-focus-name" id="station-focus-name">Điểm dừng đã chọn</div>
                         <div class="station-focus-sub" id="station-focus-sub">
                             <span class="dir-pill pill-go" id="station-focus-dir">Chiều đi</span>
                             <span id="station-focus-route-tag" style="font-size: 11.5px; color: #475569; margin-left: 6px;">Tuyến 83</span>
+                            <span id="station-focus-mini-summary" class="station-focus-mini-summary" style="display: none;"></span>
                         </div>
                     </div>
                 </div>
-                <button id="btn-close-station-focus" class="station-focus-close" title="Bỏ chọn trạm này">✕ Bỏ chọn</button>
+                <div class="station-focus-header-btns">
+                    <button id="btn-toggle-focus-card" class="station-focus-toggle-btn" title="Thu gọn hoặc mở rộng cửa sổ xe gần nhất">
+                        <span id="toggle-focus-text">▲ Thu gọn</span>
+                    </button>
+                    <button id="btn-close-station-focus" class="station-focus-close" title="Bỏ chọn trạm này">✕ Bỏ chọn</button>
+                </div>
             </div>
             <div id="station-focus-content" class="station-focus-content">
                 <!-- Sẽ được fill động bởi updateStationFocusUI() -->
@@ -145,6 +157,9 @@
                 </button>
                 <button id="btn-pick-location" class="ctrl-btn" title="Chọn vị trí thủ công trên bản đồ">
                     <span class="ctrl-icon">📍</span>
+                </button>
+                <button id="btn-toggle-map-layer" class="ctrl-btn" title="Đổi bản đồ (Google Maps / Vệ tinh)">
+                    <span class="ctrl-icon">🗺️</span>
                 </button>
                 <button id="btn-refresh-realtime" class="ctrl-btn" title="Làm mới realtime">
                     <span class="ctrl-icon">🔄</span>
@@ -198,7 +213,7 @@
                         <div class="app-version-header">
                             <div>
                                 <div style="font-weight: 800; font-size: 14.5px; color: #0f172a;">Tìm Bus Promax</div>
-                                <div style="font-size: 12px; color: #64748b;">Phiên bản: <b id="info-current-ver">v1.2.4</b></div>
+                                <div style="font-size: 12px; color: #64748b;">Phiên bản: <b id="info-current-ver">v1.2.5</b></div>
                             </div>
                             <button id="btn-manual-check-update" class="btn-primary" style="padding: 6px 12px; font-size: 12px; border-radius: 8px;">
                                 🔄 Kiểm tra cập nhật

@@ -1974,4 +1974,114 @@ body.top-controls-collapsed .top-bar {
     text-transform: uppercase;
 }
 
+/* ========================================================
+   MINIMALIST COMPACT MODES & TOGGLES (TỐI GIẢN GIAO DIỆN)
+   ======================================================== */
+.station-focus-header-btns {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.station-focus-toggle-btn {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    transition: all 0.15s ease;
+    touch-action: manipulation;
+}
+
+.station-focus-toggle-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+/* KHI THU GỌN: BIẾN THÀNH 1 THANH CAPSULE NẰM GỌN GÀNG CAO ~36PX */
+.station-focus-card.is-collapsed {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(8px);
+    border-bottom: 1.5px solid #cbd5e1;
+}
+
+.station-focus-card.is-collapsed .station-focus-header {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.station-focus-card.is-collapsed .station-focus-content {
+    display: none !important;
+}
+
+.station-focus-card.is-collapsed #station-focus-route-tag {
+    display: none;
+}
+
+.station-focus-card.is-collapsed .station-focus-mini-summary {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #d97706;
+    background: #fef3c7;
+    padding: 1px 6px;
+    border-radius: 5px;
+    margin-left: 6px;
+    white-space: nowrap;
+}
+
+/* ALERT BANNER MINIMAL ACTIONS */
+.alert-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.alert-min-btn {
+    background: rgba(0, 0, 0, 0.08);
+    border: none;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 7px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s;
+    touch-action: manipulation;
+}
+
+.alert-min-btn:hover {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.alert-banner.is-collapsed {
+    padding: 6px 12px;
+}
+
+.alert-banner.is-collapsed .alert-status-text {
+    display: none !important;
+}
+
+.alert-banner.is-collapsed .alert-station-name {
+    font-size: 12px;
+}
+
+/* NÚT BẢN ĐỒ GOOGLE MAPS / VỆ TINH */
+.btn-map-layer-active {
+    background: #0066cc !important;
+    color: #ffffff !important;
+}
+
+
 

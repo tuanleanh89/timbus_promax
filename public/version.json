@@ -1,11 +1,11 @@
 {
-  "version": "1.2.4",
+  "version": "1.2.5",
   "appName": "Tìm Bus Promax",
   "release_date": "2026-10-28",
   "changelog": [
-    "Tự động tính thời gian (ETA) và khoảng cách từ các xe đến điểm dừng đã chọn theo đúng chiều lưu thông.",
-    "Highlight xe gần nhất: Viền vàng hổ phách phát sáng nhấp nháy, hiển thị tag thông số khoảng cách/phút trên bản đồ và thẻ tiêu điểm nổi bật.",
-    "Khắc phục lỗi kích vào xe: Luôn hiển thị popup thông tin chi tiết và nút 'Canh xe này khi xuất bến' trên cả điện thoại và máy tính."
+    "Tích hợp nền bản đồ Google Maps: Tải siêu nhẹ & nhanh tại Việt Nam, đường sá sắc nét, có nút chuyển nhanh giữa Google Bản đồ và Google Vệ tinh.",
+    "Tự động chuyển sang xe gần nhất kế tiếp khi xe hiện tại đã đi qua điểm dừng, đồng thời hủy bỏ highlight và trạng thái canh xe của xe đã qua.",
+    "Tối giản giao diện: Bổ sung nút thu gọn cửa sổ xe gần nhất thành thanh capsule mini (~36px) để giải phóng tối đa diện tích bản đồ; tự động ẩn dải cảnh báo trùng lặp."
   ],
   "download_urls": {
     "web": "/",
