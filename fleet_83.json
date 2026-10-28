@@ -1,0 +1,1787 @@
+{
+  "fleetId": 83,
+  "code": "83",
+  "name": "Bến xe Gia Lâm - Bến xe Hưng Yên",
+  "operationsTime": "0|T2 - T6|05:00,18:30;0|T7|05:00,18:30;0|CN|05:00,18:30;###1|T2 - T6|05:00,19:00;1|T7|05:00,19:00;1|CN|05:00,19:00",
+  "frequence": "25-30 phút/chuyến",
+  "cost": "9000",
+  "busCount": "15",
+  "trajectoryGo": "Bến xe Gia Lâm - Ngô Gia Khảm - Ngọc Lâm - Nguyễn Văn Cừ - Nguyễn Văn Linh - Nguyễn Đức Thuận - Lý Thánh Tông (Khu đô thị Vinhomes Ocean Park) - Lý Thánh Tông - Đường Giáp Hải (KĐT Ecopark) - ĐT379 - QL39A - Nguyễn Văn Linh (Hưng Yên) - đi vào Bến xe Hưng Yên - Nguyễn Văn Linh (Hưng Yên) - quay đầu tại vòng xuyến Điện Biên, Tô Hiệu - Nguyễn Văn Linh (Hưng Yên) - quay đầu tại nút ngã tư Nguyễn Văn Linh, Tôn Thất Tùng - Nguyễn Văn Linh (Hưng Yên) - Bến xe Hưng Yên.",
+  "trajectoryReturn": "Bến xe Hưng Yên - Nguyễn Văn Linh (Hưng Yên) - quay đầu tại vòng xuyến Điện Biên, Tô Hiệu - Nguyễn Văn Linh (Hưng Yên) - QL39A - ĐT379 - Đường Giáp Hải (KĐT Ecopark) - Lý Thánh Tông (Khu đô thị Vinhomes Ocean Park) - Lý Thánh Tông - Nguyễn Đức Thuận - Nguyễn Văn Linh - Nguyễn Văn Cừ - Ngô Gia Khảm - Bến xe Gia Lâm.",
+  "go": {
+    "path": [
+      [
+        21.0482,
+        105.878467
+      ],
+      [
+        21.049789455564493,
+        105.87749719619751
+      ],
+      [
+        21.04991461659199,
+        105.88087677955629
+      ],
+      [
+        21.050194976911726,
+        105.88232785463335
+      ],
+      [
+        21.051033551502368,
+        105.88492959737779
+      ],
+      [
+        21.052553,
+        105.886167
+      ],
+      [
+        21.05422009186449,
+        105.88753670454027
+      ],
+      [
+        21.05433523658638,
+        105.88817507028583
+      ],
+      [
+        21.053999814757017,
+        105.88893145322801
+      ],
+      [
+        21.0531166666667,
+        105.8894
+      ],
+      [
+        21.0498833333333,
+        105.891833333333
+      ],
+      [
+        21.0461666666667,
+        105.894183333333
+      ],
+      [
+        21.042269587978907,
+        105.89665353298189
+      ],
+      [
+        21.0383666666667,
+        105.8983
+      ],
+      [
+        21.037112601777416,
+        105.89918017387392
+      ],
+      [
+        21.034959632383345,
+        105.90340197086336
+      ],
+      [
+        21.03175,
+        105.90975
+      ],
+      [
+        21.029736,
+        105.914455
+      ],
+      [
+        21.028117,
+        105.920079
+      ],
+      [
+        21.02598692263666,
+        105.92588424682619
+      ],
+      [
+        21.023467,
+        105.9319
+      ],
+      [
+        21.022084,
+        105.935374
+      ],
+      [
+        21.020553964739435,
+        105.93873202800751
+      ],
+      [
+        21.0180666666667,
+        105.94255
+      ],
+      [
+        21.013416,
+        105.948829
+      ],
+      [
+        21.011283,
+        105.951767
+      ],
+      [
+        21.009802634202206,
+        105.95384895801546
+      ],
+      [
+        21.007433932292656,
+        105.95176219940187
+      ],
+      [
+        21.004133,
+        105.945796
+      ],
+      [
+        21.002448518207622,
+        105.94300478696825
+      ],
+      [
+        21.001088830915236,
+        105.94001412391664
+      ],
+      [
+        20.998627339722265,
+        105.93613833189013
+      ],
+      [
+        20.998058,
+        105.93422
+      ],
+      [
+        20.99133277395706,
+        105.92179656028748
+      ],
+      [
+        20.987619222006728,
+        105.92330835112081
+      ],
+      [
+        20.983922425225128,
+        105.92491621362572
+      ],
+      [
+        20.981536009690526,
+        105.9263563156128
+      ],
+      [
+        20.978310349575835,
+        105.92730045318605
+      ],
+      [
+        20.97568569276194,
+        105.92764377593996
+      ],
+      [
+        20.972875,
+        105.929687
+      ],
+      [
+        20.97088705979901,
+        105.93021869659425
+      ],
+      [
+        20.967410709638422,
+        105.93024015426637
+      ],
+      [
+        20.965036326040003,
+        105.93016505241394
+      ],
+      [
+        20.9627333333333,
+        105.931416666667
+      ],
+      [
+        20.95486712594875,
+        105.93858718872072
+      ],
+      [
+        20.95124011098701,
+        105.94118356704713
+      ],
+      [
+        20.947817,
+        105.941433
+      ],
+      [
+        20.943386,
+        105.942709
+      ],
+      [
+        20.935869409143944,
+        105.94480991363525
+      ],
+      [
+        20.928348,
+        105.946902
+      ],
+      [
+        20.914183415829303,
+        105.95118284225465
+      ],
+      [
+        20.910916,
+        105.954014
+      ],
+      [
+        20.893328,
+        105.974329
+      ],
+      [
+        20.891431798288828,
+        105.9762454032898
+      ],
+      [
+        20.889552380480364,
+        105.97816050052643
+      ],
+      [
+        20.884305,
+        105.979994
+      ],
+      [
+        20.87767391575301,
+        105.98262906074525
+      ],
+      [
+        20.876606311518756,
+        105.98441541194916
+      ],
+      [
+        20.87484700348144,
+        105.99053084850313
+      ],
+      [
+        20.872683,
+        105.991818
+      ],
+      [
+        20.863471,
+        105.997145
+      ],
+      [
+        20.858829335798713,
+        105.99980056285858
+      ],
+      [
+        20.854309,
+        106.001972
+      ],
+      [
+        20.842891,
+        106.00773
+      ],
+      [
+        20.835198,
+        106.011879
+      ],
+      [
+        20.83221132226846,
+        106.01313114166261
+      ],
+      [
+        20.830376288112774,
+        106.01238012313844
+      ],
+      [
+        20.828942338755144,
+        106.01264834403993
+      ],
+      [
+        20.822956,
+        106.015207
+      ],
+      [
+        20.817590593542572,
+        106.01766943931581
+      ],
+      [
+        20.81054,
+        106.026283
+      ],
+      [
+        20.796588,
+        106.042436
+      ],
+      [
+        20.792397094386146,
+        106.04672312736511
+      ],
+      [
+        20.789737,
+        106.047212
+      ],
+      [
+        20.779899076196116,
+        106.04855775833131
+      ],
+      [
+        20.7706,
+        106.050573
+      ],
+      [
+        20.760738789598562,
+        106.05244159698488
+      ],
+      [
+        20.756019,
+        106.053842
+      ],
+      [
+        20.746592726153015,
+        106.05777382850648
+      ],
+      [
+        20.743412187847287,
+        106.06028437614442
+      ],
+      [
+        20.738449,
+        106.058152
+      ],
+      [
+        20.724803,
+        106.05457
+      ],
+      [
+        20.72153790553494,
+        106.05388998985292
+      ],
+      [
+        20.719209814191437,
+        106.05454444885255
+      ],
+      [
+        20.714635,
+        106.053665
+      ],
+      [
+        20.708041,
+        106.053434
+      ],
+      [
+        20.706452342337133,
+        106.05378806591035
+      ],
+      [
+        20.704497857977074,
+        106.05473756790161
+      ],
+      [
+        20.70096517019377,
+        106.0560464859009
+      ],
+      [
+        20.697542800410183,
+        106.05706036090852
+      ],
+      [
+        20.693929,
+        106.058659
+      ],
+      [
+        20.690497092185215,
+        106.059667468071
+      ],
+      [
+        20.685147354418046,
+        106.06050968170167
+      ],
+      [
+        20.677155,
+        106.059388
+      ],
+      [
+        20.670024,
+        106.05866
+      ],
+      [
+        20.666273,
+        106.058471
+      ],
+      [
+        20.661096298029687,
+        106.05812788009645
+      ],
+      [
+        20.659480042899414,
+        106.05805277824403
+      ],
+      [
+        20.657863770577674,
+        106.05796694755556
+      ],
+      [
+        20.655916189788172,
+        106.0577691346407
+      ],
+      [
+        20.654628664557833,
+        106.05779796838762
+      ],
+      [
+        20.65455838996236,
+        106.05801522731782
+      ],
+      [
+        20.659741054208666,
+        106.0583531856537
+      ],
+      [
+        20.663525667807676,
+        106.05861067771912
+      ],
+      [
+        20.66543362442898,
+        106.05868041515352
+      ],
+      [
+        20.666369085362366,
+        106.05877161026002
+      ],
+      [
+        20.666910533290494,
+        106.05877697467804
+      ],
+      [
+        20.66730767753103,
+        106.05886012315752
+      ],
+      [
+        20.667310187127985,
+        106.05858989059925
+      ],
+      [
+        20.667209803217464,
+        106.05860799551013
+      ],
+      [
+        20.665924883303433,
+        106.05849601328374
+      ],
+      [
+        20.665892258242238,
+        106.0583719611168
+      ],
+      [
+        20.666046599816013,
+        106.05810239911081
+      ]
+    ],
+    "stations": [
+      {
+        "order": 1,
+        "stationId": 7082,
+        "name": "(A) Bến xe Gia Lâm - Tuyến 83",
+        "address": "(A) Bến xe Gia Lâm - Tuyến 83",
+        "lat": 21.0482,
+        "lng": 105.878467,
+        "fleetOver": "83"
+      },
+      {
+        "order": 2,
+        "stationId": 6167,
+        "name": "668 Nguyễn Văn Cừ",
+        "address": "668 Nguyễn Văn Cừ",
+        "lat": 21.052553,
+        "lng": 105.886167,
+        "fleetOver": "11,11CT,122,15,17,54,83"
+      },
+      {
+        "order": 3,
+        "stationId": 1202,
+        "name": "Cây xăng số 84 Cầu Chui (BĐX Gia Thụy) - Nguyễn Văn Linh",
+        "address": "Cây xăng số 84 Cầu Chui (BĐX Gia Thụy) - Nguyễn Văn Linh",
+        "lat": 21.0531166666667,
+        "lng": 105.8894,
+        "fleetOver": "11,11CT,51,83"
+      },
+      {
+        "order": 4,
+        "stationId": 1203,
+        "name": "Đối diện Savico MegaMall Long Biên - Nguyễn Văn Linh",
+        "address": "Đối diện Savico MegaMall Long Biên - Nguyễn Văn Linh",
+        "lat": 21.0498833333333,
+        "lng": 105.891833333333,
+        "fleetOver": "11,11CT,51,83"
+      },
+      {
+        "order": 5,
+        "stationId": 1204,
+        "name": "Đối diện Công ty nước sạch - Nguyễn Văn Linh",
+        "address": "Đối diện Công ty nước sạch - Nguyễn Văn Linh",
+        "lat": 21.0461666666667,
+        "lng": 105.894183333333,
+        "fleetOver": "11,11CT,51,83"
+      },
+      {
+        "order": 6,
+        "stationId": 1205,
+        "name": "Đối diện UBND phường Phúc Đồng - 274 Nguyễn Văn Linh",
+        "address": "Đối diện UBND phường Phúc Đồng - 274 Nguyễn Văn Linh",
+        "lat": 21.0383666666667,
+        "lng": 105.8983,
+        "fleetOver": "11,11CT,51,83"
+      },
+      {
+        "order": 7,
+        "stationId": 1206,
+        "name": "Khu CN Sài Đồng - Hanel - Đối diện 523 Nguyễn Văn Linh",
+        "address": "Khu CN Sài Đồng - Hanel - Đối diện 523 Nguyễn Văn Linh",
+        "lat": 21.03175,
+        "lng": 105.90975,
+        "fleetOver": "11,11CT,59,83,E02"
+      },
+      {
+        "order": 8,
+        "stationId": 1207,
+        "name": "Đường vào đường Thạch Bàn - Đối diện 693 Nguyễn Văn Linh",
+        "address": "Đường vào đường Thạch Bàn - Đối diện 693 Nguyễn Văn Linh",
+        "lat": 21.029736,
+        "lng": 105.914455,
+        "fleetOver": "100,11,11CT,158,40,40CT,52,52CT,59,83,E02"
+      },
+      {
+        "order": 9,
+        "stationId": 1208,
+        "name": "Đối diện Công ty May 10 - Nguyễn Văn Linh",
+        "address": "Đối diện Công ty May 10 - Nguyễn Văn Linh",
+        "lat": 21.028117,
+        "lng": 105.920079,
+        "fleetOver": "100,11,11CT,158,40,40CT,52,52CT,59,83,E02"
+      },
+      {
+        "order": 10,
+        "stationId": 1189,
+        "name": "Qua ngã 3 cầu Thanh Trì - Nguyễn Đức Thuận",
+        "address": "Qua ngã 3 cầu Thanh Trì - Nguyễn Đức Thuận",
+        "lat": 21.023467,
+        "lng": 105.9319,
+        "fleetOver": "100,11,11CT,158,40,40CT,52,52CT,59,83,E02"
+      },
+      {
+        "order": 11,
+        "stationId": 1190,
+        "name": "Đối diện bưu điện Trâu Quỳ - Nguyễn Đức Thuận",
+        "address": "Đối diện bưu điện Trâu Quỳ - Nguyễn Đức Thuận",
+        "lat": 21.022084,
+        "lng": 105.935374,
+        "fleetOver": "100,11,11CT,158,40,40CT,52,52CT,59,83,E02"
+      },
+      {
+        "order": 12,
+        "stationId": 1191,
+        "name": "Đối diện TT Thể dục thể thao Gia Lâm - Nguyễn Đức Thuận",
+        "address": "Đối diện TT Thể dục thể thao Gia Lâm - Nguyễn Đức Thuận",
+        "lat": 21.0180666666667,
+        "lng": 105.94255,
+        "fleetOver": "100,158,40,40CT,52,52CT,83"
+      },
+      {
+        "order": 13,
+        "stationId": 1192,
+        "name": "Đối diện KĐT Đặng Xá (Km 8+00 Quốc lộ 5) - Nguyễn Đức Thuận",
+        "address": "Đối diện KĐT Đặng Xá (Km 8+00 Quốc lộ 5) - Nguyễn Đức Thuận",
+        "lat": 21.013416,
+        "lng": 105.948829,
+        "fleetOver": "40,40CT,52,52CT,83"
+      },
+      {
+        "order": 14,
+        "stationId": 1193,
+        "name": "Đối diện KCN Gia Lâm - Nguyễn Đức Thuận",
+        "address": "Đối diện KCN Gia Lâm - Nguyễn Đức Thuận",
+        "lat": 21.011283,
+        "lng": 105.951767,
+        "fleetOver": "40,40CT,52,52CT,83"
+      },
+      {
+        "order": 15,
+        "stationId": 7049,
+        "name": "Đối diện tòa P3 Vinhome OceanPark - Lý Thánh Tông",
+        "address": "Đối diện tòa P3 Vinhome OceanPark - Lý Thánh Tông",
+        "lat": 21.003863,
+        "lng": 105.945336,
+        "fleetOver": "83"
+      },
+      {
+        "order": 16,
+        "stationId": 7080,
+        "name": "Vòng xuyến Vinhome OceanPark (Trước ngã 4 Cao tốc Hà Nội - Hải Phòng 250m)",
+        "address": "Vòng xuyến Vinhome OceanPark (Trước ngã 4 Cao tốc Hà Nội - Hải Phòng 250m)",
+        "lat": 20.997952,
+        "lng": 105.934014,
+        "fleetOver": "83"
+      },
+      {
+        "order": 17,
+        "stationId": 5455,
+        "name": "Trước Ngã tư Đa Tốn-Tỉnh lộ 379 khoảng 50m",
+        "address": "Trước Ngã tư Đa Tốn-Tỉnh lộ 379 khoảng 50m",
+        "lat": 20.984983,
+        "lng": 105.9245,
+        "fleetOver": "69,83"
+      },
+      {
+        "order": 18,
+        "stationId": 6751,
+        "name": "Sau Ngã tư Đa Tốn-Tỉnh lộ 379 (kết nối 47A)",
+        "address": "Sau Ngã tư Đa Tốn-Tỉnh lộ 379 (kết nối 47A)",
+        "lat": 20.98115,
+        "lng": 105.926567,
+        "fleetOver": "47A,69,83"
+      },
+      {
+        "order": 19,
+        "stationId": 6671,
+        "name": "Gần ngã tư DT379 - Rừng Cọ (Rừng thông mé rừng cọ)",
+        "address": "Gần ngã tư DT379 - Rừng Cọ (Rừng thông mé rừng cọ)",
+        "lat": 20.972933,
+        "lng": 105.929667,
+        "fleetOver": "47A,69,83"
+      },
+      {
+        "order": 20,
+        "stationId": 6672,
+        "name": "Đối diện bệnh viện Kusumy - ĐH y khoa Tokyo",
+        "address": "Đối diện bệnh viện Kusumy - ĐH y khoa Tokyo",
+        "lat": 20.9626,
+        "lng": 105.931467,
+        "fleetOver": "69,83"
+      },
+      {
+        "order": 21,
+        "stationId": 7050,
+        "name": "Đối diện trung tâm chăm sóc ôtô Tuấn Tú - Ngã tư vòng xuyến Văn Giang",
+        "address": "Đối diện trung tâm chăm sóc ôtô Tuấn Tú - Ngã tư vòng xuyến Văn Giang",
+        "lat": 20.947967,
+        "lng": 105.94145,
+        "fleetOver": "83"
+      },
+      {
+        "order": 22,
+        "stationId": 7071,
+        "name": "Đối diện đài tưởng niệm Liệt sỹ Văn Giang - TL379",
+        "address": "Đối diện đài tưởng niệm Liệt sỹ Văn Giang - TL379",
+        "lat": 20.943167,
+        "lng": 105.942783,
+        "fleetOver": "83"
+      },
+      {
+        "order": 23,
+        "stationId": 7051,
+        "name": "Trung tâm thể thao PVF (Ngã tư Sở Đông - Văn Giang)",
+        "address": "Trung tâm thể thao PVF (Ngã tư Sở Đông - Văn Giang)",
+        "lat": 20.928183,
+        "lng": 105.947,
+        "fleetOver": "83"
+      },
+      {
+        "order": 24,
+        "stationId": 7052,
+        "name": "Qua ngã tư làng Văn hóa Đa Phúc (trạm xăng Nhật Bản Q8) - DT379",
+        "address": "Qua ngã tư làng Văn hóa Đa Phúc (trạm xăng Nhật Bản Q8) - DT379",
+        "lat": 20.910767,
+        "lng": 105.95415,
+        "fleetOver": "83"
+      },
+      {
+        "order": 25,
+        "stationId": 7053,
+        "name": "Đối diện trường Bồi dưỡng Cán bộ Kinh tế - Tài chính TL379",
+        "address": "Đối diện trường Bồi dưỡng Cán bộ Kinh tế - Tài chính TL379",
+        "lat": 20.893328,
+        "lng": 105.974329,
+        "fleetOver": "83"
+      },
+      {
+        "order": 26,
+        "stationId": 7072,
+        "name": "Trước ngã tư Làng Yên Phú - TL379",
+        "address": "Trước ngã tư Làng Yên Phú - TL379",
+        "lat": 20.884305,
+        "lng": 105.979994,
+        "fleetOver": "83"
+      },
+      {
+        "order": 27,
+        "stationId": 7054,
+        "name": "Nghĩa trang liệt sỹ Việt Yên - TL379",
+        "address": "Nghĩa trang liệt sỹ Việt Yên - TL379",
+        "lat": 20.872683,
+        "lng": 105.991818,
+        "fleetOver": "83"
+      },
+      {
+        "order": 28,
+        "stationId": 7055,
+        "name": "UBND xã Triệu Việt Vương (Ngã tư Tân Dân - Khoái Châu) - TL379",
+        "address": "UBND xã Triệu Việt Vương (Ngã tư Tân Dân - Khoái Châu) - TL379",
+        "lat": 20.863769,
+        "lng": 105.996987,
+        "fleetOver": "83"
+      },
+      {
+        "order": 29,
+        "stationId": 7073,
+        "name": "Qua Ngã tư Quán Cà 100m - TL379",
+        "address": "Qua Ngã tư Quán Cà 100m - TL379",
+        "lat": 20.853781,
+        "lng": 106.002243,
+        "fleetOver": "83"
+      },
+      {
+        "order": 30,
+        "stationId": 7056,
+        "name": "Đối diện Trường ĐH Sư Phạm Kỹ Thật Hưng Yên - TL379",
+        "address": "Đối diện Trường ĐH Sư Phạm Kỹ Thật Hưng Yên - TL379",
+        "lat": 20.842891,
+        "lng": 106.00773,
+        "fleetOver": "83"
+      },
+      {
+        "order": 31,
+        "stationId": 7057,
+        "name": "Đối diện Trường Cao đẳng Thủy Lợi, xã Việt Tiến - QL39A",
+        "address": "Đối diện Trường Cao đẳng Thủy Lợi, xã Việt Tiến - QL39A",
+        "lat": 20.835198,
+        "lng": 106.011879,
+        "fleetOver": "83"
+      },
+      {
+        "order": 32,
+        "stationId": 7058,
+        "name": "Qua ngã Tư Bô Thời 150m - QL39A",
+        "address": "Qua ngã Tư Bô Thời 150m - QL39A",
+        "lat": 20.822956,
+        "lng": 106.015207,
+        "fleetOver": "83"
+      },
+      {
+        "order": 33,
+        "stationId": 7059,
+        "name": "Trước trạm xăng Hồng Đức (Thôn Lôi Cầu, Việt Tiến) - QL39A",
+        "address": "Trước trạm xăng Hồng Đức (Thôn Lôi Cầu, Việt Tiến) - QL39A",
+        "lat": 20.809553,
+        "lng": 106.027438,
+        "fleetOver": "83"
+      },
+      {
+        "order": 34,
+        "stationId": 7074,
+        "name": "Đối diện trạm điện 110KV - QL39A",
+        "address": "Đối diện trạm điện 110KV - QL39A",
+        "lat": 20.797813,
+        "lng": 106.041085,
+        "fleetOver": "83"
+      },
+      {
+        "order": 35,
+        "stationId": 7060,
+        "name": "Cầu Trương Xá - Toàn Thắng - Kim Động - QL39A",
+        "address": "Cầu Trương Xá - Toàn Thắng - Kim Động - QL39A",
+        "lat": 20.789423,
+        "lng": 106.047281,
+        "fleetOver": "83"
+      },
+      {
+        "order": 36,
+        "stationId": 7061,
+        "name": "Cốc Ngang - Phạm Ngũ Lão - Kim Động - QL39A",
+        "address": "Cốc Ngang - Phạm Ngũ Lão - Kim Động - QL39A",
+        "lat": 20.767523,
+        "lng": 106.051168,
+        "fleetOver": "83"
+      },
+      {
+        "order": 37,
+        "stationId": 7076,
+        "name": "Đối diện cổng làng Tạ Thượng (Chính Nghĩa – Kim Động) - QL39A",
+        "address": "Đối diện cổng làng Tạ Thượng (Chính Nghĩa – Kim Động) - QL39A",
+        "lat": 20.756916,
+        "lng": 106.053482,
+        "fleetOver": "83"
+      },
+      {
+        "order": 38,
+        "stationId": 7062,
+        "name": "Qua Cầu Ngàng 200m - Thị trấn Lương Bằng ",
+        "address": "Qua Cầu Ngàng 200m - Thị trấn Lương Bằng ",
+        "lat": 20.737831,
+        "lng": 106.057988,
+        "fleetOver": "83"
+      },
+      {
+        "order": 39,
+        "stationId": 7063,
+        "name": "Đối diện Bệnh viện sản nhi Hưng Yên.- Tiên Cầu - Hiệp Cường",
+        "address": "Đối diện Bệnh viện sản nhi Hưng Yên.- Tiên Cầu - Hiệp Cường",
+        "lat": 20.724803,
+        "lng": 106.05457,
+        "fleetOver": "83"
+      },
+      {
+        "order": 40,
+        "stationId": 7079,
+        "name": "Qua Cổng chào Thành phố Hưng Yên 150m xã Hiệp Cường",
+        "address": "Qua Cổng chào Thành phố Hưng Yên 150m xã Hiệp Cường",
+        "lat": 20.714635,
+        "lng": 106.053665,
+        "fleetOver": "83"
+      },
+      {
+        "order": 41,
+        "stationId": 7092,
+        "name": "Trước Dốc Lã 150m",
+        "address": "Trước Dốc Lã 150m",
+        "lat": 20.708041,
+        "lng": 106.053434,
+        "fleetOver": "83"
+      },
+      {
+        "order": 42,
+        "stationId": 7064,
+        "name": "Vườn hoa Chéo - Dốc Suối",
+        "address": "Vườn hoa Chéo - Dốc Suối",
+        "lat": 20.691517,
+        "lng": 106.059333,
+        "fleetOver": "83"
+      },
+      {
+        "order": 43,
+        "stationId": 7065,
+        "name": "56 Nguyễn Văn Linh - Chợ Gạo",
+        "address": "56 Nguyễn Văn Linh - Chợ Gạo",
+        "lat": 20.677617,
+        "lng": 106.059517,
+        "fleetOver": "83"
+      },
+      {
+        "order": 44,
+        "stationId": 7077,
+        "name": "Sở Giáo dục Hưng Yên - Nguyễn Văn Linh",
+        "address": "Sở Giáo dục Hưng Yên - Nguyễn Văn Linh",
+        "lat": 20.670024,
+        "lng": 106.05866,
+        "fleetOver": "83"
+      },
+      {
+        "order": 45,
+        "stationId": 7075,
+        "name": "Bến xe Hưng Yên - Nguyễn Văn Linh ",
+        "address": "Bến xe Hưng Yên - Nguyễn Văn Linh ",
+        "lat": 20.666273,
+        "lng": 106.058471,
+        "fleetOver": "83"
+      },
+      {
+        "order": 46,
+        "stationId": 7028,
+        "name": "Quảng trường Nguyễn Văn Linh",
+        "address": "Quảng trường Nguyễn Văn Linh",
+        "lat": 20.655914,
+        "lng": 106.057767,
+        "fleetOver": "83"
+      },
+      {
+        "order": 47,
+        "stationId": 7070,
+        "name": "Bến xe Hưng Yên",
+        "address": "Bến xe Hưng Yên",
+        "lat": 20.66616,
+        "lng": 106.057886,
+        "fleetOver": "83"
+      }
+    ]
+  },
+  "ret": {
+    "path": [
+      [
+        20.665984,
+        106.057708
+      ],
+      [
+        20.66563878637435,
+        106.05841219425201
+      ],
+      [
+        20.660785094962165,
+        106.05809301137926
+      ],
+      [
+        20.658395837277318,
+        106.05794548988344
+      ],
+      [
+        20.654540821308416,
+        106.05768263339998
+      ],
+      [
+        20.654495644760367,
+        106.05796962976457
+      ],
+      [
+        20.656014,
+        106.057999
+      ],
+      [
+        20.661096298029687,
+        106.05836391448976
+      ],
+      [
+        20.666199,
+        106.058749
+      ],
+      [
+        20.669867,
+        106.058963
+      ],
+      [
+        20.677173,
+        106.059669
+      ],
+      [
+        20.684961665949025,
+        106.06074035167696
+      ],
+      [
+        20.68975938158557,
+        106.05993032455446
+      ],
+      [
+        20.694001,
+        106.058893
+      ],
+      [
+        20.697547818604235,
+        106.05722665786743
+      ],
+      [
+        20.701165893296185,
+        106.05619668960573
+      ],
+      [
+        20.704738720055513,
+        106.05486631393434
+      ],
+      [
+        20.706575280819028,
+        106.0539597272873
+      ],
+      [
+        20.708311,
+        106.053528
+      ],
+      [
+        20.71168341203629,
+        106.05350375175477
+      ],
+      [
+        20.714848,
+        106.053806
+      ],
+      [
+        20.719872119681053,
+        106.05449616909029
+      ],
+      [
+        20.721603131716716,
+        106.05371296405794
+      ],
+      [
+        20.724683,
+        106.054597
+      ],
+      [
+        20.738893,
+        106.058466
+      ],
+      [
+        20.743291787607276,
+        106.06029510498048
+      ],
+      [
+        20.747415441263236,
+        106.05726957321168
+      ],
+      [
+        20.755926,
+        106.053967
+      ],
+      [
+        20.759063402955608,
+        106.05284124612811
+      ],
+      [
+        20.763013573772113,
+        106.05210632085802
+      ],
+      [
+        20.770516,
+        106.050697
+      ],
+      [
+        20.7796583337461,
+        106.04874014854433
+      ],
+      [
+        20.789706,
+        106.047306
+      ],
+      [
+        20.79222658264262,
+        106.04678750038148
+      ],
+      [
+        20.796791,
+        106.042298
+      ],
+      [
+        20.810643,
+        106.026232
+      ],
+      [
+        20.817540451427888,
+        106.01770162582399
+      ],
+      [
+        20.822832,
+        106.015373
+      ],
+      [
+        20.828869638161816,
+        106.01268589496613
+      ],
+      [
+        20.829691904895277,
+        106.0124096274376
+      ],
+      [
+        20.83032364336032,
+        106.01244717836381
+      ],
+      [
+        20.83184030623728,
+        106.01321697235107
+      ],
+      [
+        20.835044,
+        106.012077
+      ],
+      [
+        20.843125,
+        106.007736
+      ],
+      [
+        20.854268,
+        106.00214
+      ],
+      [
+        20.858701508397292,
+        105.99997222423555
+      ],
+      [
+        20.863223,
+        105.997411
+      ],
+      [
+        20.872989,
+        105.991819
+      ],
+      [
+        20.874862040389573,
+        105.99048256874086
+      ],
+      [
+        20.875263024050994,
+        105.98993003368379
+      ],
+      [
+        20.876786752203827,
+        105.98383069038393
+      ],
+      [
+        20.877809245325356,
+        105.9826183319092
+      ],
+      [
+        20.8843,
+        105.980277
+      ],
+      [
+        20.889888171521882,
+        105.97806930541994
+      ],
+      [
+        20.893447,
+        105.974589
+      ],
+      [
+        20.902086399414824,
+        105.96439540386201
+      ],
+      [
+        20.911033,
+        105.95424
+      ],
+      [
+        20.913777525135032,
+        105.95138669013978
+      ],
+      [
+        20.918813498576345,
+        105.94989001750946
+      ],
+      [
+        20.928441,
+        105.947239
+      ],
+      [
+        20.943328,
+        105.942979
+      ],
+      [
+        20.947667,
+        105.941833
+      ],
+      [
+        20.95049365639156,
+        105.94155907630922
+      ],
+      [
+        20.95256267911338,
+        105.94095826148988
+      ],
+      [
+        20.95800562525413,
+        105.93605786561967
+      ],
+      [
+        20.961457147025037,
+        105.93290358781816
+      ],
+      [
+        20.9629333333333,
+        105.931766666667
+      ],
+      [
+        20.964189753993647,
+        105.93088388442993
+      ],
+      [
+        20.965807754382055,
+        105.93022942543031
+      ],
+      [
+        20.967788904388623,
+        105.93028575181962
+      ],
+      [
+        20.968840831775363,
+        105.9302642941475
+      ],
+      [
+        20.972124300365092,
+        105.93036890029909
+      ],
+      [
+        20.97315,
+        105.929833333333
+      ],
+      [
+        20.975658143638697,
+        105.92784494161607
+      ],
+      [
+        20.97708067354455,
+        105.92736482620239
+      ],
+      [
+        20.97988061362518,
+        105.92708855867387
+      ],
+      [
+        20.981180844441685,
+        105.92672304679584
+      ],
+      [
+        20.981733854589308,
+        105.92648506164552
+      ],
+      [
+        20.98367791147325,
+        105.92531171765589
+      ],
+      [
+        20.98472016511349,
+        105.92488110065462
+      ],
+      [
+        20.985505607061064,
+        105.92448315834191
+      ],
+      [
+        20.98736856765712,
+        105.92364192008974
+      ],
+      [
+        20.991282689884407,
+        105.92183947563173
+      ],
+      [
+        20.997852,
+        105.934575
+      ],
+      [
+        20.998554721359557,
+        105.93622148036958
+      ],
+      [
+        21.001168960159923,
+        105.94016164541246
+      ],
+      [
+        21.002433494106327,
+        105.94313621520998
+      ],
+      [
+        21.003884,
+        105.945994
+      ],
+      [
+        21.006597616293327,
+        105.9504532814026
+      ],
+      [
+        21.007749427529724,
+        105.95223158597948
+      ],
+      [
+        21.00931187029911,
+        105.95381140708925
+      ],
+      [
+        21.009857719845666,
+        105.95404207706453
+      ],
+      [
+        21.01125,
+        105.952266666667
+      ],
+      [
+        21.013446,
+        105.949244
+      ],
+      [
+        21.0184,
+        105.9425
+      ],
+      [
+        21.02145,
+        105.9375
+      ],
+      [
+        21.023829,
+        105.931826
+      ],
+      [
+        21.02715,
+        105.923766666667
+      ],
+      [
+        21.0289,
+        105.918383333333
+      ],
+      [
+        21.0299166666667,
+        105.9148
+      ],
+      [
+        21.0332166666667,
+        105.907483333333
+      ],
+      [
+        21.037172684197973,
+        105.8992123603821
+      ],
+      [
+        21.03865,
+        105.898466666667
+      ],
+      [
+        21.0450166666667,
+        105.895283333333
+      ],
+      [
+        21.050429,
+        105.891891
+      ],
+      [
+        21.05325,
+        105.889783333333
+      ],
+      [
+        21.05533148502572,
+        105.88804364204408
+      ],
+      [
+        21.05384461932646,
+        105.88691711425781
+      ],
+      [
+        21.052358,
+        105.885748
+      ],
+      [
+        21.049533,
+        105.883217
+      ],
+      [
+        21.047201101928117,
+        105.87877929210664
+      ],
+      [
+        21.0482,
+        105.878467
+      ]
+    ],
+    "stations": [
+      {
+        "order": 1,
+        "stationId": 7070,
+        "name": "Bến xe Hưng Yên",
+        "address": "Bến xe Hưng Yên",
+        "lat": 20.66616,
+        "lng": 106.057886,
+        "fleetOver": "83"
+      },
+      {
+        "order": 2,
+        "stationId": 7069,
+        "name": "Sở Tài Chính Hưng Yên",
+        "address": "Sở Tài Chính Hưng Yên",
+        "lat": 20.656014,
+        "lng": 106.057999,
+        "fleetOver": "83"
+      },
+      {
+        "order": 3,
+        "stationId": 7087,
+        "name": "Đối diện Bến xe Hưng Yên - Nguyễn Văn Linh",
+        "address": "Đối diện Bến xe Hưng Yên - Nguyễn Văn Linh",
+        "lat": 20.665902,
+        "lng": 106.058734,
+        "fleetOver": "83"
+      },
+      {
+        "order": 4,
+        "stationId": 7089,
+        "name": "Đối diện Sở Giáo dục Hưng Yên - Nguyễn Văn Linh ",
+        "address": "Đối diện Sở Giáo dục Hưng Yên - Nguyễn Văn Linh ",
+        "lat": 20.670131,
+        "lng": 106.05897,
+        "fleetOver": "83"
+      },
+      {
+        "order": 5,
+        "stationId": 7032,
+        "name": "403 Nguyễn Văn Linh - Chợ Gạo",
+        "address": "403 Nguyễn Văn Linh - Chợ Gạo",
+        "lat": 20.677173,
+        "lng": 106.059669,
+        "fleetOver": "83"
+      },
+      {
+        "order": 6,
+        "stationId": 7033,
+        "name": "Đối diện vườn hoa Chéo - Dốc Suối ",
+        "address": "Đối diện vườn hoa Chéo - Dốc Suối ",
+        "lat": 20.692404,
+        "lng": 106.059405,
+        "fleetOver": "83"
+      },
+      {
+        "order": 7,
+        "stationId": 7093,
+        "name": "Qua Dốc Lã 70m",
+        "address": "Qua Dốc Lã 70m",
+        "lat": 20.708311,
+        "lng": 106.053528,
+        "fleetOver": "83"
+      },
+      {
+        "order": 8,
+        "stationId": 7091,
+        "name": "Trước Cổng chào Thành phố Hưng Yên 100m xã Hiệp Cường",
+        "address": "Trước Cổng chào Thành phố Hưng Yên 100m xã Hiệp Cường",
+        "lat": 20.714848,
+        "lng": 106.053806,
+        "fleetOver": "83"
+      },
+      {
+        "order": 9,
+        "stationId": 7034,
+        "name": "Bệnh viện sản nhi Hưng Yên.- Tiên Cầu - Hiệp Cường",
+        "address": "Bệnh viện sản nhi Hưng Yên.- Tiên Cầu - Hiệp Cường",
+        "lat": 20.725196,
+        "lng": 106.054721,
+        "fleetOver": "83"
+      },
+      {
+        "order": 10,
+        "stationId": 7035,
+        "name": "Trước Cầu Ngàng 150m - Thị trấn Lương Bằng ",
+        "address": "Trước Cầu Ngàng 150m - Thị trấn Lương Bằng ",
+        "lat": 20.737683,
+        "lng": 106.058021,
+        "fleetOver": "83"
+      },
+      {
+        "order": 11,
+        "stationId": 7088,
+        "name": "Trước Cổng làng Tạ Thượng  (Chính Nghĩa – Kim Động) - QL39A",
+        "address": "Trước Cổng làng Tạ Thượng  (Chính Nghĩa – Kim Động) - QL39A",
+        "lat": 20.756891,
+        "lng": 106.053611,
+        "fleetOver": "83"
+      },
+      {
+        "order": 12,
+        "stationId": 7036,
+        "name": "Cốc Ngang - Phạm Ngũ Lão - Kim Động",
+        "address": "Cốc Ngang - Phạm Ngũ Lão - Kim Động",
+        "lat": 20.767841,
+        "lng": 106.051208,
+        "fleetOver": "83"
+      },
+      {
+        "order": 13,
+        "stationId": 7037,
+        "name": "Trước Cầu Trương Xá - Toàn Thắng - Kim Động - QL39A",
+        "address": "Trước Cầu Trương Xá - Toàn Thắng - Kim Động - QL39A",
+        "lat": 20.793154,
+        "lng": 106.04594,
+        "fleetOver": "83"
+      },
+      {
+        "order": 14,
+        "stationId": 7086,
+        "name": "Trạm điện 110Kv - QL39A",
+        "address": "Trạm điện 110Kv - QL39A",
+        "lat": 20.797763,
+        "lng": 106.041262,
+        "fleetOver": "83"
+      },
+      {
+        "order": 15,
+        "stationId": 7038,
+        "name": "Đối diện Trạm Xăng dầu Hồng Đức (Thôn Lôi Cầu, Việt Tiến) - QL39A",
+        "address": "Đối diện Trạm Xăng dầu Hồng Đức (Thôn Lôi Cầu, Việt Tiến) - QL39A",
+        "lat": 20.809648,
+        "lng": 106.027465,
+        "fleetOver": "83"
+      },
+      {
+        "order": 16,
+        "stationId": 7039,
+        "name": "Trước ngã tư Bô Thời 100m - QL39A",
+        "address": "Trước ngã tư Bô Thời 100m - QL39A",
+        "lat": 20.825703,
+        "lng": 106.014129,
+        "fleetOver": "83"
+      },
+      {
+        "order": 17,
+        "stationId": 7040,
+        "name": "Trường Cao đẳng Cơ Điện và Thủy Lợi, xã Việt Tiến - QL39A",
+        "address": "Trường Cao đẳng Cơ Điện và Thủy Lợi, xã Việt Tiến - QL39A",
+        "lat": 20.835044,
+        "lng": 106.012077,
+        "fleetOver": "83"
+      },
+      {
+        "order": 18,
+        "stationId": 7041,
+        "name": "Trường ĐH Sư Phạm Kỹ Thuật Hưng Yên - TL379",
+        "address": "Trường ĐH Sư Phạm Kỹ Thuật Hưng Yên - TL379",
+        "lat": 20.843125,
+        "lng": 106.007736,
+        "fleetOver": "83"
+      },
+      {
+        "order": 19,
+        "stationId": 7085,
+        "name": "Trước Ngã tư Quán Cà 100m - TL379",
+        "address": "Trước Ngã tư Quán Cà 100m - TL379",
+        "lat": 20.854268,
+        "lng": 106.00214,
+        "fleetOver": "83"
+      },
+      {
+        "order": 20,
+        "stationId": 7042,
+        "name": "UBND xã Triệu Việt Vương (ngã tư Tân Dân Khoái Châu 100m) - TL379",
+        "address": "UBND xã Triệu Việt Vương (ngã tư Tân Dân Khoái Châu 100m) - TL379",
+        "lat": 20.863223,
+        "lng": 105.997411,
+        "fleetOver": "83"
+      },
+      {
+        "order": 21,
+        "stationId": 7043,
+        "name": "Đối diện nghĩa trang Liệt sỹ Việt Yên - TL379",
+        "address": "Đối diện nghĩa trang Liệt sỹ Việt Yên - TL379",
+        "lat": 20.872989,
+        "lng": 105.991819,
+        "fleetOver": "83"
+      },
+      {
+        "order": 22,
+        "stationId": 7084,
+        "name": "Qua Ngã tư làng Yên Phú - TL379",
+        "address": "Qua Ngã tư làng Yên Phú - TL379",
+        "lat": 20.884866,
+        "lng": 105.980081,
+        "fleetOver": "83"
+      },
+      {
+        "order": 23,
+        "stationId": 7044,
+        "name": "Trường đào tạo Cán bộ Kinh tế - Tài Chính - TL379",
+        "address": "Trường đào tạo Cán bộ Kinh tế - Tài Chính - TL379",
+        "lat": 20.893141,
+        "lng": 105.974904,
+        "fleetOver": "83"
+      },
+      {
+        "order": 24,
+        "stationId": 7045,
+        "name": "Làng Văn hóa Đa Phúc (Trạm xăng Nhật Bản - ĐÔNG ĐÔ)",
+        "address": "Làng Văn hóa Đa Phúc (Trạm xăng Nhật Bản - ĐÔNG ĐÔ)",
+        "lat": 20.911033,
+        "lng": 105.95424,
+        "fleetOver": "83"
+      },
+      {
+        "order": 25,
+        "stationId": 7046,
+        "name": "Đối diện Trung tâm thể thao PVF (Ngã tư Sở Đông - Văn Giang)",
+        "address": "Đối diện Trung tâm thể thao PVF (Ngã tư Sở Đông - Văn Giang)",
+        "lat": 20.928441,
+        "lng": 105.947239,
+        "fleetOver": "83"
+      },
+      {
+        "order": 26,
+        "stationId": 7083,
+        "name": "Đài tưởng niệm Liệt sỹ Văn Giang",
+        "address": "Đài tưởng niệm Liệt sỹ Văn Giang",
+        "lat": 20.943328,
+        "lng": 105.942979,
+        "fleetOver": "83"
+      },
+      {
+        "order": 27,
+        "stationId": 7047,
+        "name": "Trung tâm chăm sóc ôtô Tuấn Tú - Ngã tư vòng xuyến Văn Giang",
+        "address": "Trung tâm chăm sóc ôtô Tuấn Tú - Ngã tư vòng xuyến Văn Giang",
+        "lat": 20.948239,
+        "lng": 105.941741,
+        "fleetOver": "83"
+      },
+      {
+        "order": 28,
+        "stationId": 6683,
+        "name": "Cạnh bệnh viện Kusumy - ĐH y khoa Tokyo",
+        "address": "Cạnh bệnh viện Kusumy - ĐH y khoa Tokyo",
+        "lat": 20.962933333333332,
+        "lng": 105.93176666666666,
+        "fleetOver": "69,83"
+      },
+      {
+        "order": 29,
+        "stationId": 6684,
+        "name": "Gần ngã tư DT379 - Rừng Cọ (Rừng thông - KĐT Ecopark- mé rừng thông)",
+        "address": "Gần ngã tư DT379 - Rừng Cọ (Rừng thông - KĐT Ecopark- mé rừng thông)",
+        "lat": 20.97315,
+        "lng": 105.92983333333333,
+        "fleetOver": "47A,69,83"
+      },
+      {
+        "order": 30,
+        "stationId": 6752,
+        "name": "Trước Ngã tư Đa Tốn-Tỉnh lộ 379 (kết nối 47A)",
+        "address": "Trước Ngã tư Đa Tốn-Tỉnh lộ 379 (kết nối 47A)",
+        "lat": 20.98115,
+        "lng": 105.9267,
+        "fleetOver": "47A,69,83"
+      },
+      {
+        "order": 31,
+        "stationId": 5485,
+        "name": "Qua ngã tư Đa Tốn-ĐT 379 khoảng 50m",
+        "address": "Qua ngã tư Đa Tốn-ĐT 379 khoảng 50m",
+        "lat": 20.9847,
+        "lng": 105.924883,
+        "fleetOver": "69,83"
+      },
+      {
+        "order": 32,
+        "stationId": 7081,
+        "name": "Qua Vòng xuyến Vinhome OceanPark (ngã 4 Cao tốc Hà Nội - Hải Phòng 250m",
+        "address": "Qua Vòng xuyến Vinhome OceanPark (ngã 4 Cao tốc Hà Nội - Hải Phòng 250m",
+        "lat": 20.997852,
+        "lng": 105.934575,
+        "fleetOver": "83"
+      },
+      {
+        "order": 33,
+        "stationId": 7048,
+        "name": "Tòa P3 Vinhome OceanPark - Lý Thánh Tông",
+        "address": "Tòa P3 Vinhome OceanPark - Lý Thánh Tông",
+        "lat": 21.003884,
+        "lng": 105.945994,
+        "fleetOver": "83"
+      },
+      {
+        "order": 34,
+        "stationId": 1185,
+        "name": "KCN Gia Lâm - Nguyễn Đức Thuận",
+        "address": "KCN Gia Lâm - Nguyễn Đức Thuận",
+        "lat": 21.01125,
+        "lng": 105.952266666667,
+        "fleetOver": "40,40CT,52,52CT,83"
+      },
+      {
+        "order": 35,
+        "stationId": 1186,
+        "name": "Trước cổng KĐT Đặng Xá 100m - 827 Nguyễn Đức Thuận",
+        "address": "Trước cổng KĐT Đặng Xá 100m - 827 Nguyễn Đức Thuận",
+        "lat": 21.013446,
+        "lng": 105.949244,
+        "fleetOver": "40,40CT,52,52CT,83"
+      },
+      {
+        "order": 36,
+        "stationId": 1187,
+        "name": "Trung tâm Thể dục thể thao huyện Gia Lâm - 399 Nguyễn Đức Thuận",
+        "address": "Trung tâm Thể dục thể thao huyện Gia Lâm - 399 Nguyễn Đức Thuận",
+        "lat": 21.0184,
+        "lng": 105.9425,
+        "fleetOver": "100,11,11CT,158,40,40CT,52,52CT,83"
+      },
+      {
+        "order": 37,
+        "stationId": 1188,
+        "name": "Bưu điện Trâu Quỳ - Nguyễn Đức Thuận",
+        "address": "Bưu điện Trâu Quỳ - Nguyễn Đức Thuận",
+        "lat": 21.02145,
+        "lng": 105.9375,
+        "fleetOver": "100,11,11CT,158,40,40CT,52,52CT,59,83,E02"
+      },
+      {
+        "order": 38,
+        "stationId": 2971,
+        "name": "Gần ngã ba cầu Thanh Trì - Nguyễn Đức Thuận",
+        "address": "Gần ngã ba cầu Thanh Trì - Nguyễn Đức Thuận",
+        "lat": 21.023829,
+        "lng": 105.931826,
+        "fleetOver": "100,11,11CT,158,40,40CT,52,52CT,83,E02"
+      },
+      {
+        "order": 39,
+        "stationId": 1195,
+        "name": "Qua ngã 3 cầu Thanh Trì - Nguyễn Văn Linh",
+        "address": "Qua ngã 3 cầu Thanh Trì - Nguyễn Văn Linh",
+        "lat": 21.02715,
+        "lng": 105.923766666667,
+        "fleetOver": "100,11,11CT,158,40,40CT,52,52CT,59,83,E02"
+      },
+      {
+        "order": 40,
+        "stationId": 1196,
+        "name": "Công ty May 10 - Nguyễn Văn Linh",
+        "address": "Công ty May 10 - Nguyễn Văn Linh",
+        "lat": 21.0289,
+        "lng": 105.918383333333,
+        "fleetOver": "100,11,11CT,158,40,40CT,52,52CT,59,83,E02"
+      },
+      {
+        "order": 41,
+        "stationId": 1197,
+        "name": "Gần đường vào Công ty X22 - 705 Nguyễn Văn Linh",
+        "address": "Gần đường vào Công ty X22 - 705 Nguyễn Văn Linh",
+        "lat": 21.0299166666667,
+        "lng": 105.9148,
+        "fleetOver": "11,11CT,59,83,E02"
+      },
+      {
+        "order": 42,
+        "stationId": 1198,
+        "name": "Công ty thí nghiệm miền Bắc - 465 Nguyễn Văn Linh",
+        "address": "Công ty thí nghiệm miền Bắc - 465 Nguyễn Văn Linh",
+        "lat": 21.0332166666667,
+        "lng": 105.907483333333,
+        "fleetOver": "11,11CT,83"
+      },
+      {
+        "order": 43,
+        "stationId": 1199,
+        "name": "UBND phường Phúc Đồng - 274 Nguyễn Văn Linh",
+        "address": "UBND phường Phúc Đồng - 274 Nguyễn Văn Linh",
+        "lat": 21.03865,
+        "lng": 105.898466666667,
+        "fleetOver": "11,11CT,51,83"
+      },
+      {
+        "order": 44,
+        "stationId": 1200,
+        "name": "105 - 107 Nguyễn Văn Linh",
+        "address": "105 - 107 Nguyễn Văn Linh",
+        "lat": 21.0450166666667,
+        "lng": 105.895283333333,
+        "fleetOver": "11,11CT,51,83"
+      },
+      {
+        "order": 45,
+        "stationId": 1201,
+        "name": "Hè trước Savico Megamall - Nguyễn Văn Linh",
+        "address": "Hè trước Savico Megamall - Nguyễn Văn Linh",
+        "lat": 21.050429,
+        "lng": 105.891891,
+        "fleetOver": "11,11CT,51,83"
+      },
+      {
+        "order": 46,
+        "stationId": 4215,
+        "name": "MediaMart Long Biên - Nguyễn Văn Linh",
+        "address": "MediaMart Long Biên - Nguyễn Văn Linh",
+        "lat": 21.05325,
+        "lng": 105.88978333333333,
+        "fleetOver": "11,11CT,51,83"
+      },
+      {
+        "order": 47,
+        "stationId": 6168,
+        "name": "581 Nguyễn Văn Cừ",
+        "address": "581 Nguyễn Văn Cừ",
+        "lat": 21.052246,
+        "lng": 105.885642,
+        "fleetOver": "11,11CT,122,15,17,54,83"
+      },
+      {
+        "order": 48,
+        "stationId": 551,
+        "name": "549 Nguyễn Văn Cừ (cột sau)",
+        "address": "549 Nguyễn Văn Cừ (cột sau)",
+        "lat": 21.049533,
+        "lng": 105.883217,
+        "fleetOver": "03A,11,11CT,122,15,17,34,43,48,51,65,6969,83,E02,E10"
+      },
+      {
+        "order": 49,
+        "stationId": 7082,
+        "name": "(A) Bến xe Gia Lâm - Tuyến 83",
+        "address": "(A) Bến xe Gia Lâm - Tuyến 83",
+        "lat": 21.0482,
+        "lng": 105.878467,
+        "fleetOver": "83"
+      }
+    ]
+  }
+}
