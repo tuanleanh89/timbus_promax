@@ -635,7 +635,7 @@ body.top-controls-collapsed .top-bar {
 .map-controls {
     position: absolute;
     right: 14px;
-    bottom: 90px;
+    bottom: 24px;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -665,43 +665,155 @@ body.top-controls-collapsed .top-bar {
     font-size: 20px;
 }
 
-/* BOTTOM SHEET */
+/* SIDEBAR DRAWER (Ẩn/Hiện danh sách xe đang chạy & điểm dừng - Mặc định ẩn) */
+.app-sidebar,
 .bottom-sheet {
-    position: absolute;
+    position: fixed;
+    top: 0;
     bottom: 0;
     left: 0;
-    right: 0;
-    background: #fff;
-    border-radius: 20px 20px 0 0;
-    box-shadow: 0 -4px 16px rgba(0,0,0,0.12);
-    z-index: 600;
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    width: 390px;
+    max-width: 92vw;
+    background: #ffffff;
+    border-radius: 0;
+    box-shadow: 4px 0 28px rgba(0,0,0,0.18);
+    z-index: 1000;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease;
     display: flex;
     flex-direction: column;
-    max-height: 70vh;
+    max-height: 100vh;
 }
 
+.app-sidebar.closed,
+.app-sidebar.collapsed,
+.bottom-sheet.closed,
 .bottom-sheet.collapsed {
-    transform: translateY(calc(100% - 64px));
+    transform: translateX(-100%);
+    visibility: hidden;
+    pointer-events: none;
 }
 
+.app-sidebar.open,
+.app-sidebar.expanded,
+.bottom-sheet.open,
 .bottom-sheet.expanded {
-    transform: translateY(0);
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
 }
 
-.sheet-drag-handle {
-    width: 100%;
-    padding: 10px 0 6px 0;
+.sidebar-header {
+    padding: 14px 16px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
-    justify-content: center;
-    cursor: pointer;
+    align-items: center;
+    justify-content: space-between;
 }
 
-.handle-bar {
-    width: 44px;
-    height: 5px;
-    background: #cbd5e1;
-    border-radius: 3px;
+.sidebar-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-title-icon {
+    font-size: 18px;
+}
+
+.sidebar-title-text {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.sidebar-close-btn {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #475569;
+    padding: 5px 11px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.sidebar-close-btn:hover {
+    background: #fee2e2;
+    color: #ef4444;
+    border-color: #fca5a5;
+}
+
+.sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 995;
+    transition: opacity 0.25s ease;
+}
+
+/* Floating button on map to open sidebar */
+.floating-sidebar-pill {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    padding: 7px 13px;
+    border-radius: 24px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.floating-sidebar-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+    border-color: #94a3b8;
+}
+
+.floating-sidebar-pill .pill-badge {
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 2px 7px;
+    font-size: 11.5px;
+    font-weight: 800;
+}
+
+/* Top bar toggle sidebar button */
+.btn-toggle-sidebar {
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    color: #1e293b;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+}
+
+.btn-toggle-sidebar:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
 }
 
 .sheet-tabs {
@@ -1153,109 +1265,48 @@ body.top-controls-collapsed .top-bar {
     line-height: 1.5;
 }
 
-/* LEAFLET CUSTOM MARKERS (Chuẩn thiết kế App gốc Tìm Buýt) */
-.bus-marker-badge {
-    background: #0f172a;
-    border: 2px solid #ffffff;
-    color: #ffffff;
-    font-size: 13.5px;
-    font-weight: 800;
-    border-radius: 20px;
-    padding: 3px 8px 3px 6px;
+/* LEAFLET REAL BUS MARKERS (Hình ảnh xe buýt thật, nhận biết chiều đi/về qua màu sắc) */
+.bus-real-marker {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-    white-space: nowrap;
+    justify-content: center;
     cursor: pointer;
     user-select: none;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.42));
 }
 
-.bus-marker-badge:hover {
-    transform: scale(1.12);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+.bus-real-marker:hover {
+    transform: scale(1.22);
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.65));
     z-index: 1000 !important;
 }
 
-.bus-icon-graphic {
-    width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
+.bus-real-img {
+    width: 52px;
+    height: 34px;
+    object-fit: contain;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
 }
 
-.bus-status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #22c55e;
-    box-shadow: 0 0 6px #22c55e;
-    animation: busDotPulse 1.5s infinite;
+/* Chiều đi (Xanh dương) */
+.bus-real-marker.bus-dir-go {
+    filter: drop-shadow(0 4px 8px rgba(37, 99, 235, 0.45));
+}
+.bus-real-marker.bus-dir-go:hover {
+    filter: drop-shadow(0 6px 14px rgba(37, 99, 235, 0.7));
 }
 
-@keyframes busDotPulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.35; transform: scale(0.75); }
+/* Chiều về (Cam đỏ) */
+.bus-real-marker.bus-dir-ret {
+    filter: drop-shadow(0 4px 8px rgba(234, 88, 12, 0.45));
 }
-
-.bus-plate-num {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    letter-spacing: 0.5px;
-    color: #ffffff;
-    font-weight: 800;
-    font-size: 13.5px;
-}
-
-/* PHÂN BIỆT CHIỀU ĐI (XANH DƯƠNG) VÀ CHIỀU VỀ (CAM/ĐỎ) */
-.bus-marker-badge.bus-dir-go {
-    border-color: #38bdf8;
-    background: #0f172a;
-    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45);
-}
-.bus-marker-badge.bus-dir-go .bus-status-dot {
-    background: #22c55e;
-    box-shadow: 0 0 6px #22c55e;
-}
-.bus-marker-badge.bus-dir-go .bus-dir-tag {
-    background: rgba(14, 165, 233, 0.28);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.5);
-    font-size: 11px;
-    font-weight: 800;
-    padding: 1px 5px;
-    border-radius: 6px;
-    margin-left: 3px;
-    letter-spacing: 0.2px;
-}
-.bus-marker-badge.bus-dir-go .bus-icon-graphic svg {
-    fill: #38bdf8;
-}
-
-.bus-marker-badge.bus-dir-ret {
-    border-color: #fb923c;
-    background: #0f172a;
-    box-shadow: 0 4px 14px rgba(234, 88, 12, 0.45);
-}
-.bus-marker-badge.bus-dir-ret .bus-status-dot {
-    background: #f97316;
-    box-shadow: 0 0 6px #f97316;
-}
-.bus-marker-badge.bus-dir-ret .bus-dir-tag {
-    background: rgba(249, 115, 22, 0.28);
-    color: #fb923c;
-    border: 1px solid rgba(251, 146, 60, 0.5);
-    font-size: 11px;
-    font-weight: 800;
-    padding: 1px 5px;
-    border-radius: 6px;
-    margin-left: 3px;
-    letter-spacing: 0.2px;
-}
-.bus-marker-badge.bus-dir-ret .bus-icon-graphic svg {
-    fill: #fb923c;
+.bus-real-marker.bus-dir-ret:hover {
+    filter: drop-shadow(0 6px 14px rgba(234, 88, 12, 0.7));
 }
 
 /* Hiệu ứng trượt xe mượt mà từng giây */
@@ -1913,23 +1964,26 @@ body.top-controls-collapsed .top-bar {
     gap: 8px;
 }
 
-/* LEAFLET NEAREST BUS MARKER GLOW & PULSE */
-.bus-marker-badge.bus-marker-nearest {
-    background: #78350f !important;
-    border-color: #f59e0b !important;
-    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.5), 0 0 20px rgba(245, 158, 11, 0.85) !important;
-    animation: nearestBusGlow 1.3s infinite alternate ease-in-out !important;
+/* LEAFLET NEAREST BUS REAL MARKER GLOW & PULSE */
+.bus-real-marker.bus-real-nearest {
+    animation: realNearestGlow 1.2s infinite alternate ease-in-out !important;
+    filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.95)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) !important;
     z-index: 9999 !important;
 }
 
-@keyframes nearestBusGlow {
+.bus-real-marker.bus-real-nearest .bus-real-img {
+    width: 60px;
+    height: 39px;
+}
+
+@keyframes realNearestGlow {
     0% {
-        transform: scale(1.06);
-        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.45), 0 0 12px rgba(245, 158, 11, 0.6);
+        transform: scale(1.05);
+        filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8)) drop-shadow(0 3px 6px rgba(0, 0, 0, 0.4));
     }
     100% {
         transform: scale(1.18);
-        box-shadow: 0 0 0 7px rgba(245, 158, 11, 0.7), 0 0 28px rgba(245, 158, 11, 1);
+        filter: drop-shadow(0 0 16px rgba(245, 158, 11, 1)) drop-shadow(0 6px 14px rgba(0, 0, 0, 0.6));
     }
 }
 

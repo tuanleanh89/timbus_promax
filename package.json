@@ -1,6 +1,6 @@
 {
   "name": "timbus-promax",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Ứng dụng Tìm Bus Promax - Realtime Bus Tracking & Proximity Alert",
   "main": "server.js",
   "scripts": {

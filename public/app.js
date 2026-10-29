@@ -215,8 +215,37 @@ const realtimeBusList = document.getElementById('realtime-bus-list');
 const stationList = document.getElementById('station-list');
 const routeDetailsInfo = document.getElementById('route-details-info');
 const busCountSpan = document.getElementById('bus-count');
+const floatingBusCount = document.getElementById('floating-bus-count');
 const stationCountSpan = document.getElementById('station-count');
 const loadingSpinner = document.getElementById('loading-spinner');
+
+// Sidebar Drawer Control Engine (Ẩn/Hiện danh sách xe và điểm dừng)
+window.openSidebar = function(tabName = null) {
+    if (tabName && typeof switchTab === 'function') switchTab(tabName);
+    if (bottomSheet) {
+        bottomSheet.classList.remove('closed', 'collapsed');
+        bottomSheet.classList.add('open', 'expanded');
+    }
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (backdrop) backdrop.style.display = 'block';
+};
+
+window.closeSidebar = function() {
+    if (bottomSheet) {
+        bottomSheet.classList.remove('open', 'expanded');
+        bottomSheet.classList.add('closed', 'collapsed');
+    }
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (backdrop) backdrop.style.display = 'none';
+};
+
+window.toggleSidebar = function(tabName = null) {
+    if (bottomSheet && (bottomSheet.classList.contains('open') || bottomSheet.classList.contains('expanded'))) {
+        window.closeSidebar();
+    } else {
+        window.openSidebar(tabName);
+    }
+};
 
 // Alert Modal Elements
 const alertModal = document.getElementById('alert-modal');
@@ -505,9 +534,8 @@ async function selectRoute(code) {
         // Start Realtime Tracking Polling for route
         startRealtimeTracking('route');
 
-        // Mặc định ban đầu KHÔNG mở rộng bottom sheet để người dùng nhìn trọn bản đồ
-        bottomSheet.classList.add('collapsed');
-        bottomSheet.classList.remove('expanded');
+        // Mặc định ban đầu ĐỂ ẨN sidebar để người dùng nhìn trọn bản đồ
+        closeSidebar();
 
     } catch (e) {
         showLoading(false);
@@ -700,10 +728,9 @@ function updateSavedStationsBar() {
 if (routeBadgeBox) {
     routeBadgeBox.addEventListener('click', () => {
         if (!currentRoute) return;
-        // Xổ ngay danh sách các điểm dừng ở Bottom Sheet
+        // Xổ ngay danh sách các điểm dừng ở Sidebar
         switchTab('tab-stations');
-        bottomSheet.classList.remove('collapsed');
-        bottomSheet.classList.add('expanded');
+        openSidebar('tab-stations');
 
         // Nếu người dùng đã lưu trạm hay đi, cuộn mượt tới trạm đầu tiên đã lưu của chiều hiện tại
         const curStations = (currentDirection === 'go' ? currentRoute.go.stations : currentRoute.ret.stations) || [];
@@ -824,40 +851,20 @@ function getBusSvgIcon(color = 'currentColor', size = 16) {
     </svg>`;
 }
 
-// Helper: Generate HTML for authentic Bus Marker Pill (có hỗ trợ badge xe gần nhất khi chọn trạm)
+// Helper: Generate HTML for authentic Bus Marker (Hình ảnh 1 chiếc xe bus thật, nhận biết chiều đi/về qua màu sắc xe)
 function getBusMarkerHtml(b, isNearest = false) {
     const rawPlate = String(b.plate || '').trim();
-    const numMatch = rawPlate.match(/[0-9]{4,5}$/);
-    const plateNum = numMatch ? numMatch[0] : (rawPlate.replace(/[^0-9]/g, '').slice(-5) || rawPlate);
     const isGo = b.isGo !== false;
-    const dirClass = isGo ? 'bus-dir-go' : 'bus-dir-ret';
-    const dirTag = isGo ? '➜ Đi' : '⬅ Về';
-    const busSvgColor = isNearest ? '#fbbf24' : (isGo ? '#38bdf8' : '#fb923c');
-    const nearestClass = isNearest ? 'bus-marker-nearest' : '';
-
-    let extraBadge = '';
-    if (isNearest && b.relToStation) {
-        const dText = b.relToStation.distanceMeters >= 1000 
-            ? (b.relToStation.distanceMeters / 1000).toFixed(1) + 'km' 
-            : b.relToStation.distanceMeters + 'm';
-        extraBadge = `<span class="bus-nearest-pill">⭐ ${dText} (~${b.relToStation.etaMinutes}p)</span>`;
-    } else if (b.relToStation && !b.relToStation.hasPassed && b.relToStation.distanceMeters) {
-        const dText = b.relToStation.distanceMeters >= 1000 
-            ? (b.relToStation.distanceMeters / 1000).toFixed(1) + 'km' 
-            : b.relToStation.distanceMeters + 'm';
-        extraBadge = `<span class="bus-subdist-pill">${dText}</span>`;
-    }
+    const imgSrc = isGo ? 'bus_real_go.png' : 'bus_real_ret.png';
+    const dirText = isGo ? 'Chiều đi' : 'Chiều về';
+    const nearestClass = isNearest ? 'bus-real-nearest' : '';
 
     return `
-        <div class="bus-marker-badge ${dirClass} ${nearestClass}" 
+        <div class="bus-real-marker ${isGo ? 'bus-dir-go' : 'bus-dir-ret'} ${nearestClass}" 
              onclick="event.stopPropagation(); window.openBusMarkerPopup('${rawPlate}')" 
              ontouchend="event.stopPropagation(); window.openBusMarkerPopup('${rawPlate}')"
-             title="${rawPlate} (${b.directionText || b.fleetCode || ''})">
-            <span class="bus-icon-graphic">${getBusSvgIcon(busSvgColor, 16)}</span>
-            <span class="bus-status-dot"></span>
-            <span class="bus-plate-num">${plateNum}</span>
-            <span class="bus-dir-tag">${dirTag}</span>
-            ${extraBadge}
+             title="${rawPlate} • ${dirText} (${b.directionText || b.fleetCode || 'Đang di chuyển'})">
+            <img src="${imgSrc}" class="bus-real-img" alt="${rawPlate}" draggable="false" />
         </div>
     `;
 }
@@ -939,7 +946,7 @@ window.panToBus = function(plate) {
     }
 };
 
-// Helper: Create authentic Bus Marker Pill (Chuẩn giao diện App gốc Tìm Buýt có phân biệt chiều đi/về)
+// Helper: Create authentic Real Bus Marker (Hình xe bus thật, phân biệt chiều đi/về bằng màu sắc)
 function createBusMarker(b) {
     const rawPlate = String(b.plate || '').trim();
     const isNearest = (b.isNearest === true);
@@ -947,8 +954,8 @@ function createBusMarker(b) {
     const busIcon = L.divIcon({
         className: 'bus-smooth-marker',
         html: getBusMarkerHtml(b, isNearest),
-        iconSize: isNearest ? [165, 32] : [115, 30],
-        iconAnchor: isNearest ? [82, 16] : [57, 15]
+        iconSize: isNearest ? [60, 40] : [52, 34],
+        iconAnchor: isNearest ? [30, 20] : [26, 17]
     });
 
     const m = L.marker([b.lat, b.lng], { icon: busIcon, zIndexOffset: isNearest ? 9999 : 2500 });
@@ -1230,8 +1237,7 @@ async function selectStation(st) {
 window.panToStation = function(lat, lng) {
     if (lat && lng) {
         map.setView([lat, lng], 16, { animate: true });
-        bottomSheet.classList.remove('expanded');
-        bottomSheet.classList.add('collapsed');
+        closeSidebar();
     }
 };
 
@@ -1510,8 +1516,8 @@ function updateStationFocusUI() {
         const busIcon = L.divIcon({
             className: 'bus-smooth-marker',
             html: getBusMarkerHtml(b, isNearest),
-            iconSize: isNearest ? [165, 32] : [115, 30],
-            iconAnchor: isNearest ? [82, 16] : [57, 15]
+            iconSize: isNearest ? [60, 40] : [52, 34],
+            iconAnchor: isNearest ? [30, 20] : [26, 17]
         });
         b.marker.setIcon(busIcon);
         b.marker.setZIndexOffset(isNearest ? 9999 : 2500);
@@ -1544,8 +1550,8 @@ window.clearStationFocus = function() {
             const busIcon = L.divIcon({
                 className: 'bus-smooth-marker',
                 html: getBusMarkerHtml(b, false),
-                iconSize: [115, 30],
-                iconAnchor: [57, 15]
+                iconSize: [52, 34],
+                iconAnchor: [26, 17]
             });
             b.marker.setIcon(busIcon);
             b.marker.setZIndexOffset(2500);
@@ -1721,6 +1727,7 @@ async function fetchRealtimeBuses() {
 
         const allBuses = json.buses || [];
         busCountSpan.innerText = allBuses.length;
+        if (floatingBusCount) floatingBusCount.innerText = allBuses.length + ' xe';
 
         const activePlates = new Set();
         allBuses.forEach(b => {
@@ -1788,6 +1795,7 @@ async function fetchRealtimeStationBuses() {
 
         const buses = json.buses || [];
         busCountSpan.innerText = buses.length;
+        if (floatingBusCount) floatingBusCount.innerText = buses.length + ' xe';
 
         const activePlates = new Set();
         buses.forEach(b => {
@@ -2443,30 +2451,60 @@ sheetTabs.forEach(tab => {
     tab.addEventListener('click', () => {
         const target = tab.getAttribute('data-tab');
         switchTab(target);
-        bottomSheet.classList.remove('collapsed');
-        bottomSheet.classList.add('expanded');
+        openSidebar(target);
     });
 });
 
-// Nút thu gọn / đóng Bottom Sheet
+// Nút thu gọn / đóng Bottom Sheet & Sidebar
 const btnCollapseSheet = document.getElementById('btn-collapse-sheet');
 if (btnCollapseSheet) {
     btnCollapseSheet.addEventListener('click', (e) => {
         e.stopPropagation();
-        bottomSheet.classList.remove('expanded');
-        bottomSheet.classList.add('collapsed');
+        closeSidebar();
     });
 }
 
-document.getElementById('btn-toggle-sheet').addEventListener('click', () => {
-    bottomSheet.classList.toggle('expanded');
-    bottomSheet.classList.toggle('collapsed');
-});
+const btnCloseSidebar = document.getElementById('btn-close-sidebar');
+if (btnCloseSidebar) {
+    btnCloseSidebar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeSidebar();
+    });
+}
 
-sheetHandle.addEventListener('click', () => {
-    bottomSheet.classList.toggle('expanded');
-    bottomSheet.classList.toggle('collapsed');
-});
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener('click', () => {
+        closeSidebar();
+    });
+}
+
+const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+if (btnToggleSidebar) {
+    btnToggleSidebar.addEventListener('click', () => {
+        toggleSidebar();
+    });
+}
+
+const btnFloatingSidebar = document.getElementById('btn-floating-sidebar');
+if (btnFloatingSidebar) {
+    btnFloatingSidebar.addEventListener('click', () => {
+        toggleSidebar();
+    });
+}
+
+const btnToggleSheet = document.getElementById('btn-toggle-sheet');
+if (btnToggleSheet) {
+    btnToggleSheet.addEventListener('click', () => {
+        toggleSidebar();
+    });
+}
+
+if (sheetHandle) {
+    sheetHandle.addEventListener('click', () => {
+        toggleSidebar();
+    });
+}
 
 function showLoading(show, text = 'Đang tải...') {
     loadingSpinner.style.display = show ? 'flex' : 'none';
@@ -2476,7 +2514,7 @@ function showLoading(show, text = 'Đang tải...') {
 // ==========================================
 // 4. AUTO-UPDATE APP ENGINE (Tự động cập nhật & Bảo lưu 100% dữ liệu)
 // ==========================================
-const APP_CURRENT_VERSION = '1.2.5';
+const APP_CURRENT_VERSION = '1.2.6';
 const DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/tuanleanh89/timbus_promax/main/version.json';
 
 const btnCheckUpdate = document.getElementById('btn-check-update');
@@ -2689,9 +2727,8 @@ function resetToHome() {
         if (toggleTopText) toggleTopText.innerText = 'Thu gọn';
     }
 
-    // Mặc định ban đầu KHÔNG mở rộng bottom sheet
-    bottomSheet.classList.add('collapsed');
-    bottomSheet.classList.remove('expanded');
+    // Mặc định ban đầu ĐỂ ẨN sidebar
+    closeSidebar();
 
     // Chuyển về tab xe đang chạy
     switchTab('tab-buses');

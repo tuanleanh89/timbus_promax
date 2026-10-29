@@ -1,11 +1,11 @@
 {
-  "version": "1.2.5",
+  "version": "1.2.6",
   "appName": "Tìm Bus Promax",
-  "release_date": "2026-10-28",
+  "release_date": "2026-10-29",
   "changelog": [
-    "Tích hợp nền bản đồ Google Maps: Tải siêu nhẹ & nhanh tại Việt Nam, đường sá sắc nét, có nút chuyển nhanh giữa Google Bản đồ và Google Vệ tinh.",
-    "Tự động chuyển sang xe gần nhất kế tiếp khi xe hiện tại đã đi qua điểm dừng, đồng thời hủy bỏ highlight và trạng thái canh xe của xe đã qua.",
-    "Tối giản giao diện: Bổ sung nút thu gọn cửa sổ xe gần nhất thành thanh capsule mini (~36px) để giải phóng tối đa diện tích bản đồ; tự động ẩn dải cảnh báo trùng lặp."
+    "Hiển thị xe buýt chạy bằng hình ảnh xe thật với màu sắc phân biệt chiều đi (xanh) và chiều về (cam đỏ), loại bỏ các nhãn số biển rườm rà trên bản đồ.",
+    "Chuyển đổi danh sách xe và điểm dừng vào thanh Sidebar ẩn/hiện gọn gàng, mặc định để ẩn giúp mở rộng không gian bản đồ.",
+    "Bản đồ mặc định là Google Maps đường bộ sắc nét, loại bỏ các nút điều khiển dư thừa trên bản đồ."
   ],
   "download_urls": {
     "web": "/",

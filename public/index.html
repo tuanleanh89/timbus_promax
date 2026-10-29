@@ -35,9 +35,13 @@
                     </div>
                 </div>
                 <div class="brand-actions">
+                    <button id="btn-toggle-sidebar" class="btn-toggle-sidebar" title="Mở danh sách xe & điểm dừng">
+                        <span class="sidebar-toggle-icon">📋</span>
+                        <span class="sidebar-toggle-text">Xe & Trạm</span>
+                    </button>
                     <button id="btn-check-update" class="btn-check-update" title="Kiểm tra bản cập nhật mới nhất">
                         <span id="update-icon" class="update-icon">🔄</span>
-                        <span id="update-text" class="update-text">v1.2.5</span>
+                        <span id="update-text" class="update-text">v1.2.6</span>
                     </button>
                     <button id="btn-toggle-top-controls" class="btn-toggle-top-controls" title="Ẩn/hiện ô tìm kiếm & thông tin tuyến để mở rộng bản đồ">
                         <span id="toggle-top-icon">▲</span>
@@ -150,7 +154,14 @@
         <main class="map-wrapper">
             <div id="map"></div>
 
-            <!-- Map Floating Controls -->
+            <!-- Floating Sidebar Pill Button -->
+            <button id="btn-floating-sidebar" class="floating-sidebar-pill" title="Mở danh sách xe đang chạy & điểm dừng">
+                <span class="pill-icon">📋</span>
+                <span class="pill-label">Xe & Điểm dừng</span>
+                <span id="floating-bus-count" class="pill-badge">0 xe</span>
+            </button>
+
+            <!-- Map Floating Controls (GPS, Chọn vị trí, Làm mới - Gọn gàng không nút thừa) -->
             <div class="map-controls">
                 <button id="btn-locate" class="ctrl-btn" title="Vị trí của tôi (GPS)">
                     <span class="ctrl-icon">🎯</span>
@@ -158,14 +169,8 @@
                 <button id="btn-pick-location" class="ctrl-btn" title="Chọn vị trí thủ công trên bản đồ">
                     <span class="ctrl-icon">📍</span>
                 </button>
-                <button id="btn-toggle-map-layer" class="ctrl-btn" title="Đổi bản đồ (Google Maps / Vệ tinh)">
-                    <span class="ctrl-icon">🗺️</span>
-                </button>
                 <button id="btn-refresh-realtime" class="ctrl-btn" title="Làm mới realtime">
                     <span class="ctrl-icon">🔄</span>
-                </button>
-                <button id="btn-toggle-sheet" class="ctrl-btn sheet-btn" title="Xem danh sách xe & trạm">
-                    <span class="ctrl-icon">📋</span>
                 </button>
             </div>
 
@@ -176,17 +181,23 @@
             </div>
         </main>
 
-        <!-- Bottom Sheet Panel -->
-        <div id="bottom-sheet" class="bottom-sheet collapsed">
-            <div class="sheet-drag-handle" id="sheet-handle">
-                <div class="handle-bar"></div>
+        <!-- Sidebar Backdrop (bấm ra ngoài để đóng sidebar) -->
+        <div id="sidebar-backdrop" class="sidebar-backdrop" style="display: none;"></div>
+
+        <!-- Sidebar Drawer (Danh sách xe đang chạy & điểm dừng - Ẩn mặc định) -->
+        <aside id="bottom-sheet" class="app-sidebar bottom-sheet closed collapsed">
+            <div class="sidebar-header">
+                <div class="sidebar-title-wrap">
+                    <span class="sidebar-title-icon">📋</span>
+                    <span class="sidebar-title-text">Danh sách xe & Điểm dừng</span>
+                </div>
+                <button id="btn-close-sidebar" class="sidebar-close-btn" title="Đóng danh sách">✕ Đóng</button>
             </div>
 
             <div class="sheet-tabs">
-                <button class="sheet-tab active" data-tab="tab-buses">Xe đang chạy (<span id="bus-count">0</span>)</button>
-                <button class="sheet-tab" id="tab-btn-stations" data-tab="tab-stations">Điểm dừng (<span id="station-count">0</span>)</button>
-                <button class="sheet-tab" id="tab-btn-info" data-tab="tab-info">Thông tin</button>
-                <button id="btn-collapse-sheet" class="sheet-tab-collapse-btn" title="Thu gọn danh sách xuống">▼ Đóng</button>
+                <button class="sheet-tab active" data-tab="tab-buses">🚌 Xe đang chạy (<span id="bus-count">0</span>)</button>
+                <button class="sheet-tab" id="tab-btn-stations" data-tab="tab-stations">🚏 Điểm dừng (<span id="station-count">0</span>)</button>
+                <button class="sheet-tab" id="tab-btn-info" data-tab="tab-info">ℹ️ Thông tin</button>
             </div>
 
             <div class="sheet-content">
@@ -213,7 +224,7 @@
                         <div class="app-version-header">
                             <div>
                                 <div style="font-weight: 800; font-size: 14.5px; color: #0f172a;">Tìm Bus Promax</div>
-                                <div style="font-size: 12px; color: #64748b;">Phiên bản: <b id="info-current-ver">v1.2.5</b></div>
+                                <div style="font-size: 12px; color: #64748b;">Phiên bản: <b id="info-current-ver">v1.2.6</b></div>
                             </div>
                             <button id="btn-manual-check-update" class="btn-primary" style="padding: 6px 12px; font-size: 12px; border-radius: 8px;">
                                 🔄 Kiểm tra cập nhật
@@ -222,7 +233,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </aside>
 
         <!-- Proximity Alert Setup Modal (Cảnh báo xe sắp đến) -->
         <div id="alert-modal" class="modal-backdrop" style="display: none;">
