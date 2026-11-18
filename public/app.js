@@ -1,2752 +1,1208 @@
-// BUS HANOI PRO - Core Application Logic
-// Optimized for modern Android & Desktop (Universal Search, Station Realtime, Proximity Alerts, Manual Location Pick)
+// Tìm Bus Promax — logic phía trình duyệt
+'use strict';
 
-let map = null;
-let currentRoute = null;
-let currentStation = null;
-let currentDirection = 'go'; // 'go' or 'ret'
-let polylineLayer = null;
-let corridorLayer = null;
-let arrowMarkersLayer = null;
-let stationMarkersLayer = null;
-let busMarkersLayer = null;
-let userLocationMarker = null;
-let userAccuracyCircle = null;
+// ==========================================
+// 0. HẰNG SỐ, TIỆN ÍCH
+// ==========================================
+const DEFAULT_ROUTE = '83';
+const POLL_MS = 4000;
+const ALERT_POLL_MS = 5000;
+const UPDATE_URL = 'https://raw.githubusercontent.com/tuanleanh89/timbus_promax/main/version.json';
+const KEY = {
+    defaultRoute: 'bus_hanoi_default_route',
+    favs: code => 'bus_fav_stations_' + String(code).trim(),
+    legacyFav: code => 'bus_fav_station_' + String(code).trim(),
+    updateUrl: 'custom_bus_update_url',
+    dismissedUpdate: 'bus_update_dismissed',
+    ringTested: 'bus_ring_tested'
+};
+const BUS_SIZE = [46, 30];
+const BUS_SIZE_NEAREST = [58, 38];
 
-let liveActiveBuses = new Map(); // plate -> bus object with marker, partRemained, etc.
-let busSecondTimer = null;
-let realtimeInterval = null;
-let activeAlert = null;
+const $ = id => document.getElementById(id);
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
+const isDesktop = () => window.innerWidth >= 900;
+const dirOfBus = b => (b.isGo === false ? 'ret' : 'go');
+const dirLabel = dir => (dir === 'ret' ? 'Chiều về' : 'Chiều đi');
 
-// Audio Context for Proximity Chime
-let audioCtx = null;
-function playAlertChime() {
-    try {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-
-        const now = audioCtx.currentTime;
-        const osc1 = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(587.33, now);
-        osc1.frequency.setValueAtTime(880.00, now + 0.15);
-
-        gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(0.7, now + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
-
-        osc1.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        osc1.start(now);
-        osc1.stop(now + 0.9);
-    } catch (e) {
-        console.warn('Audio play error:', e);
-    }
+function fmtDist(m) {
+    m = Math.max(0, Math.round(m || 0));
+    return m >= 1000 ? (m / 1000).toFixed(1).replace('.', ',') + ' km' : m + ' m';
 }
 
-// Realistic Telephone Ringtone Generator via Web Audio API
-let ringtoneAudioCtx = null;
-let ringtoneInterval = null;
-
-function startPhoneRingtone() {
-    try {
-        if (!ringtoneAudioCtx) {
-            ringtoneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (ringtoneAudioCtx.state === 'suspended') {
-            ringtoneAudioCtx.resume();
-        }
-        stopPhoneRingtone();
-
-        function playBurst() {
-            if (!ringtoneAudioCtx) return;
-            const now = ringtoneAudioCtx.currentTime;
-            const osc1 = ringtoneAudioCtx.createOscillator();
-            const osc2 = ringtoneAudioCtx.createOscillator();
-            const gain = ringtoneAudioCtx.createGain();
-
-            osc1.type = 'sine';
-            osc1.frequency.setValueAtTime(440, now);
-            osc2.type = 'sine';
-            osc2.frequency.setValueAtTime(480, now);
-
-            gain.gain.setValueAtTime(0, now);
-            gain.gain.linearRampToValueAtTime(0.35, now + 0.05);
-            gain.gain.setValueAtTime(0.35, now + 1.6);
-            gain.gain.linearRampToValueAtTime(0.001, now + 1.8);
-
-            osc1.connect(gain);
-            osc2.connect(gain);
-            gain.connect(ringtoneAudioCtx.destination);
-
-            osc1.start(now);
-            osc2.start(now);
-            osc1.stop(now + 1.8);
-            osc2.stop(now + 1.8);
-        }
-
-        playBurst();
-        ringtoneInterval = setInterval(playBurst, 2800);
-    } catch (e) {
-        console.warn('Ringtone error:', e);
-    }
+function etaMinutes(meters, speedKmh) {
+    const mps = Math.max(3.5, ((speedKmh > 5 ? speedKmh : 25) * 1000) / 3600);
+    return Math.max(1, Math.round(meters / mps / 60));
 }
 
-function stopPhoneRingtone() {
-    if (ringtoneInterval) {
-        clearInterval(ringtoneInterval);
-        ringtoneInterval = null;
-    }
+function formatCost(cost) {
+    const num = parseInt(String(cost || '').replace(/\D/g, ''), 10);
+    return (num || 7000).toLocaleString('vi-VN') + 'đ';
 }
 
-// Vietnamese Text-To-Speech
-function speakVietnamese(text) {
-    if (!('speechSynthesis' in window)) return;
-    try {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'vi-VN';
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-
-        const voices = window.speechSynthesis.getVoices();
-        const viVoice = voices.find(v => v.lang.includes('vi') || v.lang.includes('VN'));
-        if (viVoice) utterance.voice = viVoice;
-
-        window.speechSynthesis.speak(utterance);
-    } catch (e) {
-        console.warn('Speech error:', e);
-    }
+// "0|T2 - T6|05:00,21:00;0|T7|05:00,21:00;###1|..." -> "05:00 – 21:00 (hằng ngày)"
+function formatOperationsTime(raw) {
+    if (!raw) return 'Đang cập nhật';
+    if (!raw.includes('|')) return raw;
+    const parts = raw.split('###')[0].split(';').filter(Boolean).map(p => {
+        const [, days, times] = p.split('|');
+        return { days, times: (times || '').replace(',', ' – ') };
+    });
+    const uniqueTimes = [...new Set(parts.map(p => p.times))];
+    if (uniqueTimes.length === 1) return `${uniqueTimes[0]} (hằng ngày)`;
+    return parts.map(p => `${p.days}: ${p.times}`).join(' · ');
 }
 
-function triggerVibration() {
-    if ('vibrate' in navigator) {
-        try {
-            navigator.vibrate([500, 200, 500, 200, 500]);
-        } catch (e) {
-            console.warn('Vibration error:', e);
-        }
-    }
+let toastTimer = null;
+function toast(msg, ms = 2800) {
+    const el = $('toast');
+    el.textContent = msg;
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, ms);
 }
 
-function requestNotificationPermission() {
-    if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
+function showLoading(show) { $('loading').hidden = !show; }
+
+async function getJson(url, opts) {
+    const res = await fetch(url, opts);
+    if (!res.ok && res.status !== 404) throw new Error('HTTP ' + res.status);
+    return res.json();
 }
 
-// DOM Elements
-const searchInput = document.getElementById('route-search-input');
-const clearSearchBtn = document.getElementById('clear-search-btn');
-const searchDropdown = document.getElementById('search-dropdown');
-const activeRouteBar = document.getElementById('active-route-bar');
-const routeCodeBadge = document.getElementById('route-code-badge');
-const routeTitle = document.getElementById('route-title');
-const routeMeta = document.getElementById('route-meta');
-const directionSwitchBox = document.getElementById('direction-switch-box');
-const btnDirGo = document.getElementById('btn-dir-go');
-const btnDirRet = document.getElementById('btn-dir-ret');
-const btnSetDefault = document.getElementById('btn-set-default');
-const routeBadgeBox = document.getElementById('route-badge-box');
-const routeExpandHint = document.getElementById('route-expand-hint');
-const savedStationsBar = document.getElementById('saved-stations-bar');
-const savedStationsList = document.getElementById('saved-stations-list');
-
-// Collapsible Top Controls Toggle
-const btnToggleTopControls = document.getElementById('btn-toggle-top-controls');
-const toggleTopIcon = document.getElementById('toggle-top-icon');
-const toggleTopText = document.getElementById('toggle-top-text');
-
-const alertBanner = document.getElementById('alert-banner');
-const alertBannerStation = document.getElementById('alert-banner-station');
-const alertBannerStatus = document.getElementById('alert-banner-status');
-const btnStopAlert = document.getElementById('btn-stop-alert');
-
-// Departure Alert Elements
-const departureBanner = document.getElementById('departure-banner');
-const departureBannerTitle = document.getElementById('departure-banner-title');
-const departureBannerStatus = document.getElementById('departure-banner-status');
-const btnStopDeparture = document.getElementById('btn-stop-departure');
-
-const departureModal = document.getElementById('departure-modal');
-const modalDepartureCloseBtn = document.getElementById('modal-departure-close-btn');
-const btnCancelDepartureModal = document.getElementById('btn-cancel-departure-modal');
-const btnActivateDeparture = document.getElementById('btn-activate-departure');
-const depModalPlate = document.getElementById('dep-modal-plate');
-const depModalStatus = document.getElementById('dep-modal-status');
-const chkDepCall = document.getElementById('chk-dep-call');
-const chkDepSound = document.getElementById('chk-dep-sound');
-const chkDepVibrate = document.getElementById('chk-dep-vibrate');
-const chkDepNotify = document.getElementById('chk-dep-notify');
-const btnTestDepCall = document.getElementById('btn-test-dep-call');
-
-// Simulated Incoming Call Overlay Elements
-const incomingCallOverlay = document.getElementById('incoming-call-overlay');
-const callCallerName = document.getElementById('call-caller-name');
-const callCallerSub = document.getElementById('call-caller-sub');
-const callStatusLabel = document.getElementById('call-status-label');
-const callTimer = document.getElementById('call-timer');
-const callRingingActions = document.getElementById('call-ringing-actions');
-const callActiveActions = document.getElementById('call-active-actions');
-const btnAcceptCall = document.getElementById('btn-accept-call');
-const btnDeclineCall = document.getElementById('btn-decline-call');
-const btnHangupCall = document.getElementById('btn-hangup-call');
-
-const locationHintToast = document.getElementById('location-hint-toast');
-const btnCloseToast = document.getElementById('btn-close-toast');
-const btnCloseStationFocus = document.getElementById('btn-close-station-focus');
-
-const bottomSheet = document.getElementById('bottom-sheet');
-const sheetHandle = document.getElementById('sheet-handle');
-const sheetTabs = document.querySelectorAll('.sheet-tab');
-const tabBuses = document.getElementById('tab-buses');
-const tabStations = document.getElementById('tab-stations');
-const tabInfo = document.getElementById('tab-info');
-const tabBtnStations = document.getElementById('tab-btn-stations');
-const tabBtnInfo = document.getElementById('tab-btn-info');
-const realtimeBusList = document.getElementById('realtime-bus-list');
-const stationList = document.getElementById('station-list');
-const routeDetailsInfo = document.getElementById('route-details-info');
-const busCountSpan = document.getElementById('bus-count');
-const floatingBusCount = document.getElementById('floating-bus-count');
-const stationCountSpan = document.getElementById('station-count');
-const loadingSpinner = document.getElementById('loading-spinner');
-
-// Sidebar Drawer Control Engine (Ẩn/Hiện danh sách xe và điểm dừng)
-window.openSidebar = function(tabName = null) {
-    if (tabName && typeof switchTab === 'function') switchTab(tabName);
-    if (bottomSheet) {
-        bottomSheet.classList.remove('closed', 'collapsed');
-        bottomSheet.classList.add('open', 'expanded');
-    }
-    const backdrop = document.getElementById('sidebar-backdrop');
-    if (backdrop) backdrop.style.display = 'block';
+// ==========================================
+// 1. TRẠNG THÁI
+// ==========================================
+const state = {
+    map: null,
+    layers: {},
+    route: null,
+    geo: { go: null, ret: null },          // lộ trình đã tính quãng đường tích luỹ
+    orders: { go: new Map(), ret: new Map() }, // stationId -> số thứ tự trạm
+    dir: 'go',
+    station: null,                         // trạm đang chọn
+    stopMarkers: new Map(),                // stationId -> marker của chiều hiện tại
+    tempStopMarker: null,
+    buses: new Map(),                      // biển số -> xe
+    nearestPlate: null,
+    alert: null,                           // canh xe đến trạm
+    departure: null,                       // canh xe xuất bến
+    modal: null,                           // { mode: 'station'|'departure', target }
+    searchResults: [],
+    picking: false,
+    userMarker: null,
+    userCircle: null,
+    version: null
 };
 
-window.closeSidebar = function() {
-    if (bottomSheet) {
-        bottomSheet.classList.remove('open', 'expanded');
-        bottomSheet.classList.add('closed', 'collapsed');
-    }
-    const backdrop = document.getElementById('sidebar-backdrop');
-    if (backdrop) backdrop.style.display = 'none';
-};
+// ==========================================
+// 2. LƯU TRỮ (tuyến mặc định, trạm đã lưu)
+// ==========================================
+const getDefaultRoute = () => localStorage.getItem(KEY.defaultRoute) || DEFAULT_ROUTE;
 
-window.toggleSidebar = function(tabName = null) {
-    if (bottomSheet && (bottomSheet.classList.contains('open') || bottomSheet.classList.contains('expanded'))) {
-        window.closeSidebar();
-    } else {
-        window.openSidebar(tabName);
-    }
-};
-
-// Alert Modal Elements
-const alertModal = document.getElementById('alert-modal');
-const modalCloseBtn = document.getElementById('modal-close-btn');
-const btnCancelModal = document.getElementById('btn-cancel-modal');
-const btnActivateAlert = document.getElementById('btn-activate-alert');
-const modalRouteName = document.getElementById('modal-route-name');
-const modalStationName = document.getElementById('modal-station-name');
-const alertDistanceSelect = document.getElementById('alert-distance-select');
-const chkCall = document.getElementById('chk-call');
-const chkSound = document.getElementById('chk-sound');
-const chkVibrate = document.getElementById('chk-vibrate');
-const chkNotification = document.getElementById('chk-notification');
-const btnTestAlertSound = document.getElementById('btn-test-alert-sound');
-
-let pendingAlert = null;
-let searchDebounce = null;
-let currentTileLayer = null;
-let currentTileType = 'google_roadmap'; // 'google_roadmap' (Google Maps chuẩn), 'google_hybrid' (Vệ tinh), 'osm' (OpenStreetMap)
-
-// Chuyển đổi linh hoạt giữa Google Maps và các bản đồ khác
-function setMapTileLayer(type) {
-    if (!map) return;
-    if (currentTileLayer) {
-        map.removeLayer(currentTileLayer);
-    }
-    currentTileType = type;
-
-    if (type === 'google_roadmap') {
-        currentTileLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-            maxZoom: 20,
-            subdomains: ['0', '1', '2', '3'],
-            attribution: '© Google Maps'
-        }).addTo(map);
-    } else if (type === 'google_hybrid') {
-        currentTileLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-            maxZoom: 20,
-            subdomains: ['0', '1', '2', '3'],
-            attribution: '© Google Maps Satellite'
-        }).addTo(map);
-    } else {
-        currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            subdomains: ['a', 'b', 'c'],
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
-    }
-
-    if (currentTileLayer && currentTileLayer.bringToBack) {
-        currentTileLayer.bringToBack();
-    }
+function getFavs(code) {
+    try {
+        const raw = localStorage.getItem(KEY.favs(code));
+        if (raw) { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; }
+        const legacy = localStorage.getItem(KEY.legacyFav(code));
+        return legacy ? [JSON.parse(legacy)].filter(Boolean) : [];
+    } catch { return []; }
 }
 
-// Initialize Map
+const saveFavs = (code, list) => localStorage.setItem(KEY.favs(code), JSON.stringify(list));
+
+// Trạm đã lưu có thuộc chiều `dir` không (bản ghi cũ không có `direction` thì suy ra từ danh sách trạm)
+function favMatches(f, stationId, dir) {
+    if (f.stationId !== stationId) return false;
+    return f.direction ? f.direction === dir : state.orders[dir].has(stationId);
+}
+
+function isFav(stationId, dir) {
+    return !!state.route && getFavs(state.route.code).some(f => favMatches(f, stationId, dir));
+}
+
+function toggleFav(st) {
+    if (!state.route || !st) return;
+    const dir = st.dir || state.dir;
+    const list = getFavs(state.route.code);
+    const i = list.findIndex(f => favMatches(f, st.stationId, dir));
+    if (i >= 0) list.splice(i, 1);
+    else list.push({ stationId: st.stationId, name: st.name, lat: st.lat, lng: st.lng, direction: dir });
+    saveFavs(state.route.code, list);
+    renderSavedChips();
+    renderStationList();
+    renderFocusStatic();
+}
+
+function currentDirFavs() {
+    if (!state.route) return [];
+    return getFavs(state.route.code).filter(f => favMatches(f, f.stationId, state.dir));
+}
+
+// ==========================================
+// 3. BẢN ĐỒ
+// ==========================================
 function initMap() {
-    map = L.map('map', {
+    const map = L.map('map', {
         zoomControl: false,
-        attributionControl: false
-    }).setView([21.028511, 105.854167], 13);
+        attributionControl: false,
+        preferCanvas: true,      // vẽ lộ trình bằng canvas: nhẹ hơn SVG khi kéo/zoom
+        zoomSnap: 0.5
+    }).setView([21.0285, 105.8542], 13);
+    // Google Maps đường phố, ẩn địa điểm (POI) và icon giao thông công cộng của Google
+    // để bản đồ thoáng, không lẫn với chấm trạm của app. Ô bản đồ ~15 KB, được sw.js cache lâu dài.
+    L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&hl=vi&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff%2Cs.t%3A4%7Cp.v%3Aoff', {
+        maxZoom: 20,
+        subdomains: ['0', '1', '2', '3'],
+        crossOrigin: 'anonymous',
+        keepBuffer: 4,           // giữ thêm ô xung quanh để kéo bản đồ không bị trắng
+        updateWhenZooming: false
+    }).addTo(map);
 
-    // Mặc định nạp Google Maps sắc nét, đường phố tiếng Việt chuẩn và tải siêu nhẹ/nhanh tại VN
-    setMapTileLayer('google_roadmap');
+    state.map = map;
+    state.layers = {
+        route: L.layerGroup().addTo(map),
+        stops: L.layerGroup().addTo(map),
+        buses: L.layerGroup().addTo(map)
+    };
 
-    stationMarkersLayer = L.layerGroup().addTo(map);
-    arrowMarkersLayer = L.layerGroup().addTo(map);
-    busMarkersLayer = L.layerGroup().addTo(map);
+    const el = map.getContainer();
+    const syncLabels = () => el.classList.toggle('show-labels', map.getZoom() >= 16);
+    // Tắt hiệu ứng trượt của xe khi đang zoom để xe không "bay" qua màn hình
+    map.on('zoomstart', () => el.classList.add('zooming'));
+    map.on('zoomend', () => { syncLabels(); setTimeout(() => el.classList.remove('zooming'), 50); });
+    syncLabels();
 
-    // Click map to pick manual location (Chỉ kích hoạt khi người dùng bấm nút Chọn vị trí thủ công)
-    map.on('click', (e) => {
-        if (isPickingLocationMode) {
-            handleManualLocationPick(e.latlng.lat, e.latlng.lng);
-            isPickingLocationMode = false;
-        }
+    map.on('click', e => {
+        if (!state.picking) return;
+        state.picking = false;
+        setUserPosition(e.latlng.lat, e.latlng.lng, 20);
     });
 }
 
-// Universal Search (Routes + Stations)
-searchInput.addEventListener('input', (e) => {
-    const val = e.target.value.trim();
-    clearSearchBtn.style.display = val ? 'flex' : 'none';
-
-    if (!val) {
-        searchDropdown.style.display = 'none';
-        return;
-    }
-
-    if (searchDebounce) clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(() => {
-        executeSearch(val);
-    }, 250);
-});
-
-async function executeSearch(query) {
-    try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        const json = await res.json();
-        if (!json.success) return;
-
-        const routes = json.routes || [];
-        const stations = json.stations || [];
-
-        if (routes.length === 0 && stations.length === 0) {
-            searchDropdown.innerHTML = `<div class="empty-hint" style="padding: 16px;">Không tìm thấy tuyến hoặc điểm dừng nào với từ khóa "${query}"</div>`;
-            searchDropdown.style.display = 'block';
-            return;
-        }
-
-        let html = '';
-
-        // 1. Phân nhóm Tuyến xe buýt
-        if (routes.length > 0) {
-            html += `<div class="dropdown-header">🚌 TUYẾN XE BUÝT (${routes.length})</div>`;
-            html += routes.map(r => `
-                <div class="dropdown-item" data-type="route" data-code="${r.code}">
-                    <div class="dropdown-badge">${r.code}</div>
-                    <div class="dropdown-info">
-                        <div class="dropdown-name">${r.name}</div>
-                        <div class="dropdown-desc">${r.frequence || ''} • Giá vé: ${r.cost ? Number(r.cost).toLocaleString('vi-VN') : 7000}đ</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // 2. Phân nhóm Điểm dừng / Trạm xe buýt (Phân biệt rõ Chiều đi và Chiều về)
-        if (stations.length > 0) {
-            const currentRouteCode = currentRoute ? currentRoute.code : '83';
-            const curFavList = getSavedFavStations(currentRouteCode);
-
-            html += `<div class="dropdown-header">🚏 ĐIỂM DỪNG / TRẠM BUÝT (${stations.length})</div>`;
-            html += stations.map(s => {
-                const isGo = s.isGo === true;
-                const isRet = s.isGo === false;
-                const badgeClass = isGo ? 'badge-go' : (isRet ? 'badge-ret' : '');
-                const badgeText = isGo ? 'Chiều đi' : (isRet ? 'Chiều về' : 'Trạm');
-                const pillClass = isGo ? 'pill-go' : (isRet ? 'pill-ret' : '');
-                const pillText = s.directionText || (isGo ? 'Chiều đi' : (isRet ? 'Chiều về' : ''));
-                const dirVal = isGo ? 'go' : (isRet ? 'ret' : (currentDirection || 'go'));
-
-                const isFav = curFavList.some(fav => fav.stationId === s.stationId && (fav.direction ? fav.direction === dirVal : true));
-
-                return `
-                <div class="dropdown-item" data-type="station" data-id="${s.stationId}" data-name="${encodeURIComponent(s.name)}" data-lat="${s.lat}" data-lng="${s.lng}" data-fleet="${encodeURIComponent(s.fleetOver || '')}" data-dir="${dirVal}">
-                    <div class="dropdown-badge station-badge ${badgeClass}">${badgeText}</div>
-                    <div class="dropdown-info">
-                        <div class="dropdown-name">
-                            ${s.name}
-                            ${pillText ? `<span class="dir-pill ${pillClass}">${pillText}</span>` : ''}
-                        </div>
-                        <div class="dropdown-desc">Tuyến đi qua: <b>${s.fleetOver || 'Nhiều tuyến'}</b> ${s.address ? '• ' + s.address : ''}</div>
-                    </div>
-                    <button class="dropdown-fav-btn ${isFav ? 'is-fav' : ''}" 
-                            onclick="event.stopPropagation(); toggleFavFromSearch(${s.stationId}, '${s.name.replace(/'/g, "\\'")}', ${s.lat}, ${s.lng}, '${dirVal}', this)" 
-                            title="${isFav ? 'Bỏ ghim điểm dừng này' : 'Ghim điểm dừng này'}">
-                        ${isFav ? '★' : '☆'}
-                    </button>
-                </div>
-                `;
-            }).join('');
-        }
-
-        searchDropdown.innerHTML = html;
-        searchDropdown.style.display = 'block';
-
-    } catch (e) {
-        console.error('Search error:', e);
-    }
+function fitRoute() {
+    const line = state.layers.route.getLayers()[0];
+    if (line) state.map.fitBounds(line.getBounds(), { paddingTopLeft: [20, 130], paddingBottomRight: [20, 40] });
 }
 
-// Helper: Ghim / Bỏ ghim nhanh từ kết quả tìm kiếm (hiển thị ngôi sao vàng)
-window.toggleFavFromSearch = function(stationId, stationName, lat, lng, direction, btnEl) {
-    const routeCode = currentRoute ? currentRoute.code : '83';
-    let favList = getSavedFavStations(routeCode);
-
-    const existingIdx = favList.findIndex(s => s.stationId === stationId && (s.direction ? s.direction === direction : true));
-    if (existingIdx !== -1) {
-        favList.splice(existingIdx, 1);
-        if (btnEl) {
-            btnEl.classList.remove('is-fav');
-            btnEl.innerText = '☆';
-            btnEl.title = 'Ghim điểm dừng này';
-        }
-    } else {
-        favList.push({
-            stationId,
-            name: stationName,
-            lat,
-            lng,
-            direction: direction
-        });
-        if (btnEl) {
-            btnEl.classList.add('is-fav');
-            btnEl.innerText = '★';
-            btnEl.title = 'Bỏ ghim điểm dừng này';
-        }
-    }
-
-    saveFavStations(routeCode, favList);
-    renderCurrentDirection();
-    updateSavedStationsBar();
-};
-
-clearSearchBtn.addEventListener('click', () => {
-    searchInput.value = '';
-    clearSearchBtn.style.display = 'none';
-    searchDropdown.style.display = 'none';
-    searchInput.focus();
-});
-
-// Dropdown click handler
-searchDropdown.addEventListener('click', (e) => {
-    // Nếu bấm vào nút ngôi sao thì không chọn trạm
-    if (e.target.closest('.dropdown-fav-btn')) return;
-
-    const item = e.target.closest('.dropdown-item');
-    if (!item) return;
-
-    const type = item.getAttribute('data-type');
-    searchDropdown.style.display = 'none';
-
-    if (type === 'route') {
-        const code = item.getAttribute('data-code');
-        searchInput.value = `Tuyến ${code}`;
-        selectRoute(code);
-    } else if (type === 'station') {
-        const stationId = parseInt(item.getAttribute('data-id'), 10);
-        const name = decodeURIComponent(item.getAttribute('data-name'));
-        const lat = parseFloat(item.getAttribute('data-lat'));
-        const lng = parseFloat(item.getAttribute('data-lng'));
-        const fleetOver = decodeURIComponent(item.getAttribute('data-fleet'));
-        const dir = item.getAttribute('data-dir');
-
-        searchInput.value = name;
-        selectStation({ stationId, name, lat, lng, fleetOver, direction: dir });
-    }
-});
-
 // ==========================================
-// 1. SELECT & DISPLAY A BUS ROUTE
+// 4. TUYẾN XE
 // ==========================================
 async function selectRoute(code) {
-    showLoading(true, `Đang tải tuyến ${code}...`);
-    currentStation = null;
-
+    showLoading(true);
+    let json;
     try {
-        const res = await fetch(`/api/route/${encodeURIComponent(code)}`);
-        const json = await res.json();
-        showLoading(false);
-
-        if (!json.success) {
-            alert('Không tìm thấy thông tin tuyến ' + code);
-            return;
-        }
-
-        currentRoute = json.data;
-        currentDirection = 'go';
-
-        // Clear previous buses from memory & map
-        liveActiveBuses.forEach(b => { if (b.marker) busMarkersLayer.removeLayer(b.marker); });
-        liveActiveBuses.clear();
-        busMarkersLayer.clearLayers();
-
-        // Update Top Active Bar
-        activeRouteBar.style.display = 'flex';
-        directionSwitchBox.style.display = 'flex';
-        tabBtnStations.style.display = 'block';
-        tabBtnInfo.style.display = 'block';
-
-        const totalStations = (currentRoute.go.stations || []).length;
-        routeCodeBadge.innerText = currentRoute.code;
-        routeTitle.innerText = currentRoute.name;
-        if (routeExpandHint) {
-            routeExpandHint.innerText = `🚏 ${totalStations} điểm dừng ▼`;
-        }
-        routeMeta.innerText = `${currentRoute.frequence || '15-20 phút/chuyến'} • Giá vé: ${formatCost(currentRoute.cost)}`;
-
-        btnDirGo.classList.add('active');
-        btnDirRet.classList.remove('active');
-
-        // Update Default Route Button State & Saved Stations Bar
-        updateDefaultRouteButtonState();
-        updateSavedStationsBar();
-
-        // Render map & UI
-        renderCurrentDirection();
-
-        // Start Realtime Tracking Polling for route
-        startRealtimeTracking('route');
-
-        // Mặc định ban đầu ĐỂ ẨN sidebar để người dùng nhìn trọn bản đồ
-        closeSidebar();
-
+        json = await getJson(`/api/route/${encodeURIComponent(code)}`);
     } catch (e) {
         showLoading(false);
-        console.error('Error selecting route:', e);
-        alert('Lỗi tải dữ liệu: ' + e.message);
+        return toast('Lỗi tải dữ liệu tuyến: ' + e.message);
     }
-}
+    showLoading(false);
+    if (!json.success) return toast(`Không tìm thấy tuyến ${code}`);
 
-// Cost Formatter (Tránh lỗi hiển thị NaNđ)
-function formatCost(cost) {
-    if (!cost) return '7.000đ';
-    const digits = String(cost).replace(/[^0-9]/g, '');
-    const num = parseInt(digits, 10);
-    if (!num || isNaN(num) || num === 0) return '9.000đ';
-    return Number(num).toLocaleString('vi-VN') + 'đ';
-}
-
-// Default Route Persistence
-function updateDefaultRouteButtonState() {
-    if (!btnSetDefault) return;
-    if (!currentRoute) {
-        btnSetDefault.style.display = 'none';
-        return;
-    }
-    btnSetDefault.style.display = 'flex';
-    const defaultRoute = localStorage.getItem('bus_hanoi_default_route') || '83';
-    if (String(currentRoute.code).trim() === String(defaultRoute).trim()) {
-        btnSetDefault.classList.add('is-default');
-        btnSetDefault.innerHTML = '★ Tuyến mặc định';
-        btnSetDefault.title = 'Tuyến này đã được đặt làm mặc định khi mở app';
-    } else {
-        btnSetDefault.classList.remove('is-default');
-        btnSetDefault.innerHTML = '☆ Đặt làm mặc định';
-        btnSetDefault.title = `Bấm để đặt Tuyến ${currentRoute.code} làm tuyến mặc định khi mở app`;
-    }
-}
-
-if (btnSetDefault) {
-    btnSetDefault.addEventListener('click', () => {
-        if (!currentRoute) return;
-        localStorage.setItem('bus_hanoi_default_route', currentRoute.code);
-        updateDefaultRouteButtonState();
-        alert(`⭐ Đã đặt Tuyến ${currentRoute.code} làm tuyến mặc định!\nLần sau khi mở app, hệ thống sẽ tự động hiển thị Tuyến ${currentRoute.code}.`);
-    });
-}
-
-// Event Listener: Thu gọn / Hiện thanh tìm kiếm & thông tin tuyến để mở rộng bản đồ
-if (btnToggleTopControls) {
-    btnToggleTopControls.addEventListener('click', () => {
-        const isCollapsed = document.body.classList.toggle('top-controls-collapsed');
-        btnToggleTopControls.classList.toggle('is-collapsed', isCollapsed);
-        if (toggleTopIcon) toggleTopIcon.innerText = isCollapsed ? '▼' : '▲';
-        if (toggleTopText) toggleTopText.innerText = isCollapsed ? 'Hiện tuyến' : 'Thu gọn';
-    });
-}
-
-// Multiple Saved Stations Management per Route
-function getSavedFavStations(routeCode) {
-    if (!routeCode) return [];
-    try {
-        const raw = localStorage.getItem('bus_fav_stations_' + String(routeCode).trim());
-        if (!raw) {
-            // Tương thích ngược với key cũ đơn điểm nếu có
-            const oldSingle = localStorage.getItem('bus_fav_station_' + String(routeCode).trim());
-            if (oldSingle) {
-                const parsed = JSON.parse(oldSingle);
-                return parsed ? [parsed] : [];
-            }
-            return [];
-        }
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-        return [];
-    }
-}
-
-function saveFavStations(routeCode, stationsList) {
-    if (!routeCode) return;
-    localStorage.setItem('bus_fav_stations_' + String(routeCode).trim(), JSON.stringify(stationsList));
-}
-
-window.toggleFavStation = function(stationId, stationName, lat, lng) {
-    if (!currentRoute) return;
-    const routeCode = currentRoute.code;
-    let favList = getSavedFavStations(routeCode);
-
-    const existingIdx = favList.findIndex(s => s.stationId === stationId && (s.direction ? s.direction === currentDirection : true));
-    if (existingIdx !== -1) {
-        favList.splice(existingIdx, 1);
-    } else {
-        favList.push({
-            stationId,
-            name: stationName,
-            lat,
-            lng,
-            direction: currentDirection
-        });
-    }
-
-    saveFavStations(routeCode, favList);
-    renderCurrentDirection();
-    updateSavedStationsBar();
-};
-
-window.removeFavStation = function(stationId) {
-    if (!currentRoute) return;
-    const routeCode = currentRoute.code;
-    let favList = getSavedFavStations(routeCode);
-    favList = favList.filter(s => !(s.stationId === stationId && (s.direction ? s.direction === currentDirection : true)));
-    saveFavStations(routeCode, favList);
-    renderCurrentDirection();
-    updateSavedStationsBar();
-};
-
-window.panToSavedStation = function(stationId, lat, lng) {
-    if (currentRoute) {
-        const curStations = (currentDirection === 'go' ? currentRoute.go.stations : currentRoute.ret.stations) || [];
-        const found = curStations.find(s => s.stationId === stationId);
-        if (found) {
-            selectStation({ ...found, direction: currentDirection });
-            return;
-        }
-    }
-    selectStation({ stationId, name: 'Điểm dừng đã lưu', lat, lng, direction: currentDirection });
-};
-
-function updateSavedStationsBar() {
-    if (!savedStationsBar || !savedStationsList) return;
-    if (!currentRoute) {
-        savedStationsBar.style.display = 'none';
-        return;
-    }
-
-    const allFavList = getSavedFavStations(currentRoute.code);
-    if (!allFavList || allFavList.length === 0) {
-        savedStationsBar.style.display = 'none';
-        return;
-    }
-
-    // Lấy danh sách trạm thuộc chiều hiện tại
-    const curStations = (currentDirection === 'go' ? currentRoute.go.stations : currentRoute.ret.stations) || [];
-    const curStationIds = new Set(curStations.map(s => s.stationId));
-
-    const otherStations = (currentDirection === 'go' ? currentRoute.ret.stations : currentRoute.go.stations) || [];
-    const otherStationIds = new Set(otherStations.map(s => s.stationId));
-
-    // LỌC CHUẨN XÁC: Chiều đi chỉ hiện điểm ở chiều đi, Chiều về chỉ hiện điểm ở chiều về
-    const dirFavList = allFavList.filter(s => {
-        if (s.direction) {
-            return s.direction === currentDirection;
-        }
-        if (curStationIds.has(s.stationId)) {
-            return true;
-        }
-        if (otherStationIds.has(s.stationId)) {
-            return false;
-        }
-        return false;
-    });
-
-    if (dirFavList.length === 0) {
-        savedStationsBar.style.display = 'none';
-        return;
-    }
-
-    const isGo = currentDirection === 'go';
-    const dirLabel = isGo ? 'Chiều đi' : 'Chiều về';
-    const dirChipClass = isGo ? 'chip-dir-go' : 'chip-dir-ret';
-
-    const headerTitle = document.getElementById('saved-title-text');
-    if (headerTitle) {
-        headerTitle.innerText = `Đã lưu (${dirLabel}):`;
-    }
-
-    savedStationsList.innerHTML = dirFavList.map(s => {
-        const cleanName = s.name.replace(/^[0-9A-Z\(\)\s,-]+ - /, '') || s.name;
-        return `
-            <div class="saved-station-chip ${dirChipClass}" onclick="panToSavedStation(${s.stationId}, ${s.lat}, ${s.lng})" title="Bấm để xem trạm ${s.name} (${dirLabel})">
-                <span class="chip-name">⭐ ${cleanName}</span>
-                <button class="chip-del-btn" onclick="event.stopPropagation(); removeFavStation(${s.stationId})" title="Bỏ lưu trạm này">✕</button>
-            </div>
-        `;
-    }).join('');
-
-    savedStationsBar.style.display = 'flex';
-}
-
-// Click on Route Title / Badge -> Automatically Open Stations List Tab
-if (routeBadgeBox) {
-    routeBadgeBox.addEventListener('click', () => {
-        if (!currentRoute) return;
-        // Xổ ngay danh sách các điểm dừng ở Sidebar
-        switchTab('tab-stations');
-        openSidebar('tab-stations');
-
-        // Nếu người dùng đã lưu trạm hay đi, cuộn mượt tới trạm đầu tiên đã lưu của chiều hiện tại
-        const curStations = (currentDirection === 'go' ? currentRoute.go.stations : currentRoute.ret.stations) || [];
-        const curStationIds = new Set(curStations.map(s => s.stationId));
-        const allFav = getSavedFavStations(currentRoute.code);
-        const curFav = allFav.filter(s => (s.direction ? s.direction === currentDirection : curStationIds.has(s.stationId)));
-
-        if (curFav && curFav.length > 0) {
-            const firstFav = curFav[0];
-            setTimeout(() => {
-                const el = document.getElementById(`station-item-${firstFav.stationId}`);
-                if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.classList.add('highlight-target');
-                    setTimeout(() => el.classList.remove('highlight-target'), 2500);
-                }
-            }, 300);
-        }
-    });
-}
-
-// Direction Switch Buttons
-btnDirGo.addEventListener('click', () => {
-    if (currentDirection === 'go') return;
-    currentDirection = 'go';
-    btnDirGo.classList.add('active');
-    btnDirRet.classList.remove('active');
-    renderCurrentDirection();
-    updateSavedStationsBar();
-    fetchRealtimeBuses();
-});
-
-btnDirRet.addEventListener('click', () => {
-    if (currentDirection === 'ret') return;
-    currentDirection = 'ret';
-    btnDirRet.classList.add('active');
-    btnDirGo.classList.remove('active');
-    renderCurrentDirection();
-    updateSavedStationsBar();
-    fetchRealtimeBuses();
-});
-
-// Helper: Calculate distance in meters between two coordinates
-function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
-
-// Helper: Find closest point index in path polyline
-function findClosestPathIndex(path, stLat, stLng) {
-    let minDist = Infinity;
-    let bestIdx = 0;
-    for (let i = 0; i < path.length; i++) {
-        const d = getDistance(stLat, stLng, path[i][0], path[i][1]);
-        if (d < minDist) {
-            minDist = d;
-            bestIdx = i;
-        }
-    }
-    return bestIdx;
-}
-
-// Helper: Interpolate exact position backwards along route path
-function interpolatePositionBackwards(path, targetLat, targetLng, distanceMeters) {
-    if (!path || path.length === 0) return { lat: targetLat, lng: targetLng, bearing: 0 };
-    if (!distanceMeters || distanceMeters <= 5) return { lat: targetLat, lng: targetLng, bearing: 0 };
-
-    const targetIdx = findClosestPathIndex(path, targetLat, targetLng);
-    let remaining = distanceMeters;
-    let currIdx = targetIdx;
-
-    while (currIdx > 0 && remaining > 0) {
-        const pCurrent = path[currIdx];
-        const pPrev = path[currIdx - 1];
-        const segDist = getDistance(pCurrent[0], pCurrent[1], pPrev[0], pPrev[1]);
-
-        if (remaining <= segDist) {
-            const ratio = remaining / (segDist || 1);
-            const lat = pCurrent[0] + (pPrev[0] - pCurrent[0]) * ratio;
-            const lng = pCurrent[1] + (pPrev[1] - pCurrent[1]) * ratio;
-            const bearing = calculateBearing(pPrev[0], pPrev[1], pCurrent[0], pCurrent[1]);
-            return { lat, lng, bearing };
-        } else {
-            remaining -= segDist;
-            currIdx--;
-        }
-    }
-
-    const firstPt = path[0];
-    const secondPt = path[1] || firstPt;
-    return {
-        lat: firstPt[0],
-        lng: firstPt[1],
-        bearing: calculateBearing(firstPt[0], firstPt[1], secondPt[0], secondPt[1])
+    const route = json.data;
+    state.route = route;
+    state.geo = { go: Geo.buildGeo(route.go.path), ret: Geo.buildGeo(route.ret.path) };
+    state.orders = {
+        go: new Map(route.go.stations.map((s, i) => [s.stationId, s.order || i + 1])),
+        ret: new Map(route.ret.stations.map((s, i) => [s.stationId, s.order || i + 1]))
     };
+    state.dir = 'go';
+    clearStation();
+    clearBuses();
+
+    $('route-row').hidden = false;
+    $('route-code').textContent = route.code;
+    $('route-title').textContent = route.name;
+    renderDefaultStar();
+    renderDirection(true);
+    renderRouteInfo();
+    startPolling();
 }
 
-// Helper: Calculate bearing angle between two coords
-function calculateBearing(lat1, lon1, lat2, lon2) {
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
-    const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
-              Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
-    const brng = Math.atan2(y, x) * 180 / Math.PI;
-    return (brng + 360) % 360;
+function setDirection(dir, fit = true) {
+    if (state.dir === dir) return;
+    state.dir = dir;
+    renderDirection(fit);
+    refreshBuses();
 }
 
-// Helper: Vector SVG Bus Icon for authentic vehicle representation
-function getBusSvgIcon(color = 'currentColor', size = 16) {
-    return `<svg class="bus-badge-svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="${color}" style="vertical-align: middle; display: inline-block;">
-        <path d="M4 16c0 .55.45 1 1 1h1v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V17h6v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V17h1c.55 0 1-.45 1-1V6c0-1.66-1.34-3-3-3H7C5.34 3 4 4.34 4 6v10zm2-10h12v4H6V6zm1.5 7.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
-    </svg>`;
+function renderDirection(fit) {
+    $('btn-dir-go').classList.toggle('active', state.dir === 'go');
+    $('btn-dir-ret').classList.toggle('active', state.dir === 'ret');
+    renderRouteLayers();
+    renderSavedChips();
+    renderStationList();
+    if (fit) fitRoute();
 }
 
-// Helper: Generate HTML for authentic Bus Marker (Hình ảnh 1 chiếc xe bus thật, nhận biết chiều đi/về qua màu sắc xe)
-function getBusMarkerHtml(b, isNearest = false) {
-    const rawPlate = String(b.plate || '').trim();
-    const isGo = b.isGo !== false;
-    const imgSrc = isGo ? 'bus_real_go.png' : 'bus_real_ret.png';
-    const dirText = isGo ? 'Chiều đi' : 'Chiều về';
-    const nearestClass = isNearest ? 'bus-real-nearest' : '';
+function renderRouteLayers() {
+    const { route, dir, layers } = state;
+    const data = route[dir];
+    const color = dir === 'go' ? '#2563eb' : '#ea580c';
 
-    return `
-        <div class="bus-real-marker ${isGo ? 'bus-dir-go' : 'bus-dir-ret'} ${nearestClass}" 
-             onclick="event.stopPropagation(); window.openBusMarkerPopup('${rawPlate}')" 
-             ontouchend="event.stopPropagation(); window.openBusMarkerPopup('${rawPlate}')"
-             title="${rawPlate} • ${dirText} (${b.directionText || b.fleetCode || 'Đang di chuyển'})">
-            <img src="${imgSrc}" class="bus-real-img" alt="${rawPlate}" draggable="false" />
-        </div>
-    `;
-}
-
-// Helper: Update Popup Content for live bus
-function updateBusPopup(marker, b) {
-    if (!marker) return;
-    const rawPlate = String(b.plate || '').trim();
-    const isGo = b.isGo !== false;
-    const dirTag = isGo ? '➜ Chiều đi' : '⬅ Chiều về';
-    const dirColor = isGo ? '#0284c7' : '#ea580c';
-    const dirBg = isGo ? '#e0f2fe' : '#ffedd5';
-
-    let distNotice = '';
-    if (currentStation && b.relToStation) {
-        if (b.relToStation.isSameDir) {
-            if (b.relToStation.hasPassed) {
-                distNotice = `<div style="margin-top: 6px; padding: 5px 8px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; color: #dc2626; font-size: 12px; font-weight: 700;">⚠️ Xe đã đi qua trạm đang chọn (${currentStation.name})</div>`;
-            } else {
-                const dText = b.relToStation.distanceMeters >= 1000 ? (b.relToStation.distanceMeters/1000).toFixed(1) + ' km' : b.relToStation.distanceMeters + ' m';
-                distNotice = `<div style="margin-top: 6px; padding: 5px 8px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; color: #1e40af; font-size: 12px; font-weight: 700; display: flex; justify-content: space-between;">
-                    <span>Đến trạm ${currentStation.name}:</span>
-                    <span>${dText} (~${b.relToStation.etaMinutes}p)</span>
-                </div>`;
-            }
-        }
+    layers.route.clearLayers();
+    if (data.path.length) {
+        L.polyline(data.path, { color, weight: 5, opacity: 0.85, lineJoin: 'round' }).addTo(layers.route);
     }
 
-    const popupHtml = `
-        <div style="font-family: inherit; font-size: 13.5px; min-width: 220px; padding: 2px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
-                <span style="font-weight: 800; font-size: 16px; color: #0f172a;">🚌 ${rawPlate}</span>
-                <span style="background: ${dirBg}; color: ${dirColor}; font-size: 11.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px;">${dirTag}</span>
-            </div>
-            <div style="margin-top: 6px; color: #475569; font-size: 12.5px;">Hướng đi: <b style="color: #0f172a;">${b.directionText || b.fleetCode || 'Đang lưu thông'}</b></div>
-            <div style="margin-top: 3px; color: #475569; font-size: 12.5px;">Trạm sắp tới: <b style="color: #0f172a;">${b.nextStation || 'Dọc tuyến'}</b></div>
-            <div style="margin-top: 6px; padding: 6px 10px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; font-weight: 700; color: #ea580c; display: flex; justify-content: space-between;">
-                <span>Cách: ${b.partRemained >= 1000 ? (b.partRemained/1000).toFixed(1) + ' km' : Math.round(b.partRemained || 0) + ' m'}</span>
-                <span>còn ~${Math.max(1, Math.round((b.timeRemained || 0)/60))} phút</span>
-            </div>
-            ${distNotice}
-            <button ontouchend="event.stopPropagation();" onclick="event.stopPropagation(); openDepartureModal('${rawPlate}', '${b.fleet || (currentRoute ? currentRoute.code : '')}', '${(b.nextStation || '').replace(/'/g, "\\'")}', ${b.partRemained || 0}, ${b.lat}, ${b.lng})" 
-                    style="width: 100%; margin-top: 8px; background: #2563eb; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; touch-action: manipulation;">
-                🚀 Canh xe này khi xuất bến
-            </button>
-        </div>
-    `;
-
-    if (marker.getPopup && marker.getPopup()) {
-        marker.setPopupContent(popupHtml);
-    } else {
-        marker.bindPopup(popupHtml, {
-            offset: [0, -12],
-            autoPan: true,
-            closeButton: true,
-            autoPanPadding: [30, 30]
-        });
-    }
-}
-
-// Helper: Mở popup của marker xe một cách độc lập và tin cậy
-window.openBusMarkerPopup = function(plate) {
-    const rawPlate = String(plate || '').trim();
-    const bus = liveActiveBuses.get(rawPlate);
-    if (bus && bus.marker) {
-        bus.marker.openPopup();
-    }
-};
-
-// Helper: Pan bản đồ tới vị trí xe và mở popup
-window.panToBus = function(plate) {
-    const rawPlate = String(plate || '').trim();
-    const bus = liveActiveBuses.get(rawPlate);
-    if (bus && bus.lat && bus.lng) {
-        map.setView([bus.lat, bus.lng], 16, { animate: true });
-        setTimeout(() => {
-            if (bus.marker) bus.marker.openPopup();
-        }, 200);
-    }
-};
-
-// Helper: Create authentic Real Bus Marker (Hình xe bus thật, phân biệt chiều đi/về bằng màu sắc)
-function createBusMarker(b) {
-    const rawPlate = String(b.plate || '').trim();
-    const isNearest = (b.isNearest === true);
-
-    const busIcon = L.divIcon({
-        className: 'bus-smooth-marker',
-        html: getBusMarkerHtml(b, isNearest),
-        iconSize: isNearest ? [60, 40] : [52, 34],
-        iconAnchor: isNearest ? [30, 20] : [26, 17]
-    });
-
-    const m = L.marker([b.lat, b.lng], { icon: busIcon, zIndexOffset: isNearest ? 9999 : 2500 });
-    
-    // Ràng buộc popup trước khi gắn sự kiện
-    updateBusPopup(m, b);
-
-    m.on('click', (e) => {
-        if (e && e.originalEvent) {
-            e.originalEvent.stopPropagation();
-        }
-        L.DomEvent.stopPropagation(e);
-        m.openPopup();
-    });
-
-    return m;
-}
-
-// Render Polyline & Stations for current direction
-function renderCurrentDirection() {
-    if (!currentRoute) return;
-
-    const dirData = currentDirection === 'go' ? currentRoute.go : currentRoute.ret;
-    const path = dirData ? (dirData.path || []) : [];
-    const stations = dirData ? (dirData.stations || []) : [];
-
-    if (corridorLayer) {
-        map.removeLayer(corridorLayer);
-        corridorLayer = null;
-    }
-    if (polylineLayer) {
-        map.removeLayer(polylineLayer);
-        polylineLayer = null;
-    }
-    if (arrowMarkersLayer) {
-        arrowMarkersLayer.clearLayers();
-    }
-
-    const isGo = currentDirection === 'go';
-    // Làn đường corridor màu hồng đào/salmon y hệt app gốc
-    const corridorColor = isGo ? '#93c5fd' : '#fca5a5';
-    const roadColor = isGo ? '#2563eb' : '#ea580c';
-
-    if (path.length > 0) {
-        // 1. Dải hành lang làn đường (Road Ribbon)
-        corridorLayer = L.polyline(path, {
-            color: corridorColor,
-            weight: 14,
-            opacity: 0.55,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }).addTo(map);
-
-        // 2. Vạch tim đường xe chạy chính
-        polylineLayer = L.polyline(path, {
-            color: roadColor,
-            weight: 4.5,
-            opacity: 0.95,
-            lineCap: 'round',
-            lineJoin: 'round'
-        }).addTo(map);
-
-        // 3. Mũi tên chỉ hướng di chuyển dọc làn đường (↓ / ↑)
-        const step = Math.max(3, Math.floor(path.length / 14));
-        for (let i = 1; i < path.length; i += step) {
-            const p1 = path[i - 1];
-            const p2 = path[i];
-            const arrowAngle = calculateBearing(p1[0], p1[1], p2[0], p2[1]);
-            const arrowIcon = L.divIcon({
-                className: '',
-                html: `<div class="road-arrow-marker" style="transform: rotate(${arrowAngle - 90}deg); color: ${roadColor};">➤</div>`,
-                iconSize: [16, 16],
-                iconAnchor: [8, 8]
-            });
-            arrowMarkersLayer.addLayer(L.marker([p2[0], p2[1]], { icon: arrowIcon, interactive: false }));
-        }
-
-        map.fitBounds(polylineLayer.getBounds(), { padding: [60, 60] });
-    }
-
-    // Draw Stations (Biển trạm buýt xanh chuẩn app gốc)
-    stationMarkersLayer.clearLayers();
-    stations.forEach((st, idx) => {
+    layers.stops.clearLayers();
+    state.stopMarkers.clear();
+    state.tempStopMarker = null;
+    const last = data.stations.length - 1;
+    data.stations.forEach((st, i) => {
         if (!st.lat || !st.lng) return;
-
-        const displayName = (st.name || '').replace(/^[0-9A-Z\(\)\s,-]+ - /, '') || st.name || 'Điểm dừng';
-        const isStart = idx === 0;
-        const isEnd = idx === stations.length - 1;
-
-        const stationIcon = L.divIcon({
-            className: 'station-marker-pin',
-            html: `
-                <div class="station-pin-icon" style="${isStart ? 'background:#16a34a;' : (isEnd ? 'background:#dc2626;' : '')}" title="${st.name}">
-                    🚏
-                </div>
-                <div class="station-pin-label">${displayName}</div>
-            `,
-            iconSize: [120, 48],
-            iconAnchor: [60, 11]
+        const terminal = i === 0 || i === last;
+        const icon = L.divIcon({
+            className: `stop-icon ${dir}${terminal ? ' terminal' : ''}`,
+            html: `<div class="stop-dot"></div><div class="stop-label">${esc(st.name)}</div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
         });
-
-        const m = L.marker([st.lat, st.lng], { icon: stationIcon });
-        m.on('click', () => {
-            selectStation({ stationId: st.stationId, name: st.name, lat: st.lat, lng: st.lng, direction: currentDirection, order: st.order || (idx + 1) });
-        });
-        m.bindPopup(`
-            <div style="font-family: inherit; min-width: 195px;">
-                <div style="font-size: 11px; font-weight: 700; color: #64748b;">Trạm số ${st.order || (idx + 1)}</div>
-                <div style="font-size: 14.5px; font-weight: 800; color: #0f172a; margin-top: 2px;">${st.name || 'Điểm dừng xe buýt'}</div>
-                <div style="font-size: 12px; color: #475569; margin: 4px 0;">${st.address || ''}</div>
-                <button onclick="selectStation({ stationId: ${st.stationId}, name: '${(st.name || '').replace(/'/g, "\\'")}', lat: ${st.lat}, lng: ${st.lng}, direction: '${currentDirection}', order: ${st.order || (idx + 1)} })" 
-                        style="width: 100%; margin-top: 6px; background: #0066cc; color: #fff; border: none; padding: 7px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
-                    🎯 Chọn trạm & xem xe gần nhất
-                </button>
-                <button onclick="openAlertModalForStation(${st.stationId}, '${(st.name || st.address || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${st.lat}, ${st.lng})" 
-                        style="width: 100%; margin-top: 6px; background: #ea580c; color: #fff; border: none; padding: 7px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer;">
-                    🔔 Đặt cảnh báo xe đến đây
-                </button>
-            </div>
-        `);
-        stationMarkersLayer.addLayer(m);
+        const m = L.marker([st.lat, st.lng], { icon, title: st.name, zIndexOffset: terminal ? 100 : 0 })
+            .on('click', () => selectStation({ ...st, dir }))
+            .addTo(layers.stops);
+        state.stopMarkers.set(st.stationId, m);
     });
+    highlightStopMarker();
+}
 
-    // Render Stations Tab (Hỗ trợ lưu nhiều điểm dừng)
-    const favList = getSavedFavStations(currentRoute.code);
-    stationCountSpan.innerText = stations.length;
-    stationList.innerHTML = stations.map((st, idx) => {
-        const isFav = favList.some(s => s.stationId === st.stationId && (s.direction ? s.direction === currentDirection : true));
+function renderDefaultStar() {
+    const btn = $('btn-set-default');
+    const on = state.route && String(state.route.code) === getDefaultRoute();
+    btn.classList.toggle('on', on);
+    btn.textContent = on ? '★' : '☆';
+    btn.title = on ? 'Đây là tuyến mặc định khi mở app' : 'Đặt làm tuyến mặc định';
+}
+
+function renderSavedChips() {
+    const row = $('saved-row');
+    const favs = currentDirFavs();
+    row.hidden = favs.length === 0;
+    row.innerHTML = favs.map((f, i) => `
+        <div class="chip" data-action="chip" data-idx="${i}" title="${esc(f.name)}">
+            <span class="chip-name">★ ${esc(f.name)}</span>
+            <button class="chip-del" data-action="chip-del" data-idx="${i}" aria-label="Bỏ lưu">✕</button>
+        </div>`).join('');
+}
+
+function renderStationList() {
+    if (!state.route) return;
+    const stations = state.route[state.dir].stations;
+    $('station-count').textContent = stations.length;
+    $('pane-stations').innerHTML = stations.length ? stations.map((st, i) => {
+        const fav = isFav(st.stationId, state.dir);
+        const sub = st.address && st.address !== st.name ? st.address : '';
+        const sel = state.station && state.station.stationId === st.stationId;
         return `
-        <div id="station-item-${st.stationId}" class="station-item ${isFav ? 'is-fav' : ''}" onclick="selectStation({ stationId: ${st.stationId}, name: '${(st.name || st.address || '').replace(/'/g, "\\'")}', lat: ${st.lat}, lng: ${st.lng}, direction: '${currentDirection}', order: ${st.order || (idx + 1)} })">
-            <div class="station-order">${st.order || (idx + 1)}</div>
-            <div class="station-info">
-                <div class="station-name">
-                    ${st.name || 'Trạm xe buýt'}
-                    ${isFav ? '<span style="color:#ca8a04; font-size:11px; margin-left:4px; font-weight:800;">(★ Trạm đã lưu)</span>' : ''}
-                </div>
-                <div class="station-address">${st.address || ''}</div>
+        <div class="row${sel ? ' hl' : ''}" id="stop-row-${st.stationId}" data-action="select-stop" data-idx="${i}">
+            <div class="order">${st.order || i + 1}</div>
+            <div class="row-main">
+                <div class="row-title">${esc(st.name)}</div>
+                ${sub ? `<div class="row-sub">${esc(sub)}</div>` : ''}
             </div>
-            <button class="btn-fav-station ${isFav ? 'is-fav' : ''}" onclick="event.stopPropagation(); toggleFavStation(${st.stationId}, '${(st.name || st.address || '').replace(/'/g, "\\'")}', ${st.lat}, ${st.lng})" title="${isFav ? 'Bỏ lưu trạm này' : 'Lưu làm điểm dừng hay đón xe'}">
-                ${isFav ? '★' : '☆'}
-            </button>
-            <button class="btn-station-alert" onclick="event.stopPropagation(); openAlertModalForStation(${st.stationId}, '${(st.name || st.address || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${st.lat}, ${st.lng})">
-                🔔 Báo xe
-            </button>
-        </div>
-        `;
-    }).join('');
+            <button class="icon-btn star${fav ? ' on' : ''}" data-action="fav-stop" data-idx="${i}" aria-label="Lưu trạm">${fav ? '★' : '☆'}</button>
+        </div>`;
+    }).join('') : '<div class="empty">Chưa có thông tin điểm dừng.</div>';
+}
 
-    // Render Info Tab
-    routeDetailsInfo.innerHTML = `
-        <div class="info-card">
-            <div class="info-row">
-                <span class="info-label">Tuyến số:</span>
-                <span class="info-value">Tuyến ${currentRoute.code}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Tần suất:</span>
-                <span class="info-value">${currentRoute.frequence || 'Đang cập nhật'}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Giá vé:</span>
-                <span class="info-value">${formatCost(currentRoute.cost)}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Giờ hoạt động:</span>
-                <span class="info-value">${currentRoute.operationsTime || '05:00 - 21:00'}</span>
-            </div>
-        </div>
-        <div class="info-card info-desc-box">
-            <h4>Lộ trình Chiều đi:</h4>
-            <p>${currentRoute.trajectoryGo || 'Đang cập nhật'}</p>
-            <h4 style="margin-top: 10px;">Lộ trình Chiều về:</h4>
-            <p>${currentRoute.trajectoryReturn || 'Đang cập nhật'}</p>
-        </div>
-    `;
+function renderRouteInfo() {
+    const r = state.route;
+    $('route-info').innerHTML = `
+        <div class="info">
+            <dl>
+                <dt>Tuyến</dt><dd>${esc(r.code)} · ${esc(r.name)}</dd>
+                <dt>Tần suất</dt><dd>${esc(r.frequence || 'Đang cập nhật')}</dd>
+                <dt>Giá vé</dt><dd>${formatCost(r.cost)}</dd>
+                <dt>Hoạt động</dt><dd>${esc(formatOperationsTime(r.operationsTime))}</dd>
+            </dl>
+            <h4>Lộ trình chiều đi</h4><p>${esc(r.trajectoryGo || 'Đang cập nhật')}</p>
+            <h4>Lộ trình chiều về</h4><p>${esc(r.trajectoryReturn || 'Đang cập nhật')}</p>
+        </div>`;
 }
 
 // ==========================================
-// 2. SELECT & DISPLAY A SPECIFIC STATION (ĐIỂM DỪNG)
+// 5. ĐIỂM DỪNG ĐANG CHỌN
 // ==========================================
+// Xác định trạm thuộc chiều nào của tuyến hiện tại (null nếu không thuộc tuyến)
+function resolveStationDir(st, preferred) {
+    const inGo = state.orders.go.has(st.stationId);
+    const inRet = state.orders.ret.has(st.stationId);
+    if (inGo && inRet) return preferred || state.dir;
+    return inGo ? 'go' : inRet ? 'ret' : null;
+}
+
 async function selectStation(st) {
-    currentStation = st;
-
-    // 1. Giữ nguyên hoặc nạp tuyến xe để LUÔN hiển thị highlight lộ trình và các xe đang chạy
-    let targetRouteCode = currentRoute ? currentRoute.code : '83';
-    if (!currentRoute) {
-        if (st.fleetOver) {
-            const fleets = st.fleetOver.split(',').map(f => f.trim()).filter(Boolean);
-            if (fleets.length > 0) targetRouteCode = fleets[0];
-        }
-        await selectRoute(targetRouteCode);
-    }
-
-    // 2. Tự động đồng bộ chiều đi / chiều về tương ứng với điểm dừng vừa chọn
-    if (currentRoute) {
-        const inGo = currentRoute.go && currentRoute.go.stations && currentRoute.go.stations.some(s => s.stationId === st.stationId);
-        const inRet = currentRoute.ret && currentRoute.ret.stations && currentRoute.ret.stations.some(s => s.stationId === st.stationId);
-
-        if (st.direction === 'ret' || (inRet && !inGo)) {
-            if (currentDirection !== 'ret') {
-                currentDirection = 'ret';
-                btnDirRet.classList.add('active');
-                btnDirGo.classList.remove('active');
-                renderCurrentDirection();
-                updateSavedStationsBar();
-            }
-        } else if (st.direction === 'go' || inGo) {
-            if (currentDirection !== 'go') {
-                currentDirection = 'go';
-                btnDirGo.classList.add('active');
-                btnDirRet.classList.remove('active');
-                renderCurrentDirection();
-                updateSavedStationsBar();
-            }
+    // Trạm từ ô tìm kiếm không thuộc tuyến đang xem -> chuyển sang tuyến đầu tiên đi qua trạm
+    if (!state.route || !resolveStationDir(st)) {
+        const fleets = String(st.fleetOver || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (!state.route || (fleets.length && !fleets.includes(String(state.route.code)))) {
+            await selectRoute(fleets[0] || getDefaultRoute());
         }
     }
+    if (!state.route) return;
 
-    // 3. Pan bản đồ tới điểm dừng và mở popup trạm
-    if (st.lat && st.lng) {
-        map.setView([st.lat, st.lng], 16, { animate: true });
+    const dir = resolveStationDir(st, st.dir);
+    if (dir && dir !== state.dir) setDirection(dir, false);
+    const routeSt = dir && state.route[dir].stations.find(s => s.stationId === st.stationId);
+    state.station = { ...st, ...(routeSt || {}), dir, order: dir ? state.orders[dir].get(st.stationId) : null };
 
-        setTimeout(() => {
-            const allStationMarkers = stationMarkersLayer.getLayers();
-            let found = false;
-            for (const sm of allStationMarkers) {
-                if (sm.getLatLng && Math.abs(sm.getLatLng().lat - st.lat) < 0.0001 && Math.abs(sm.getLatLng().lng - st.lng) < 0.0001) {
-                    sm.openPopup();
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                const stationIcon = L.divIcon({
-                    className: 'station-marker-pin',
-                    html: `
-                        <div class="station-pin-icon" style="background: #0066cc; width: 28px; height: 28px; font-size: 16px;" title="${st.name}">🚏</div>
-                        <div class="station-pin-label" style="font-size: 12.5px; font-weight: 800; max-width: 170px;">${st.name}</div>
-                    `,
-                    iconSize: [170, 52],
-                    iconAnchor: [85, 14]
-                });
-                const tempM = L.marker([st.lat, st.lng], { icon: stationIcon, zIndexOffset: 2000 });
-                tempM.bindPopup(`
-                    <div style="font-family: inherit; min-width: 195px;">
-                        <div style="font-size: 15px; font-weight: 800; color: #0066cc;">🚏 ${st.name}</div>
-                        <div style="font-size: 12px; color: #475569; margin: 4px 0;">Tuyến đi qua: <b>${st.fleetOver || (currentRoute ? currentRoute.code : '83')}</b></div>
-                        <button onclick="openAlertModalForStation(${st.stationId}, '${(st.name || '').replace(/'/g, "\\'")}', '${currentRoute ? currentRoute.code : ''}', ${st.lat}, ${st.lng})" 
-                                style="width: 100%; margin-top: 8px; background: #ea580c; color: #fff; border: none; padding: 7px 10px; border-radius: 6px; font-weight: 700; font-size: 12.5px; cursor: pointer;">
-                            🔔 Đặt cảnh báo xe đến đây
-                        </button>
-                    </div>
-                `).openPopup();
-                stationMarkersLayer.addLayer(tempM);
-            }
-        }, 300);
+    document.body.classList.add('has-focus');
+    $('focus-card').hidden = false;
+    highlightStopMarker();
+    if (st.lat && st.lng) state.map.setView([st.lat, st.lng], 16);
+    renderFocusStatic();
+    updateFocus();
+    renderStationList();
+}
+
+function clearStation() {
+    state.station = null;
+    state.nearestPlate = null;
+    document.body.classList.remove('has-focus');
+    $('focus-card').hidden = true;
+    highlightStopMarker();
+    for (const b of state.buses.values()) setBusIcon(b, false);
+    renderBusList();
+}
+
+function highlightStopMarker() {
+    for (const m of state.stopMarkers.values()) m.getElement()?.classList.remove('selected');
+    if (state.tempStopMarker) { state.layers.stops.removeLayer(state.tempStopMarker); state.tempStopMarker = null; }
+    const st = state.station;
+    if (!st) return;
+    const m = state.stopMarkers.get(st.stationId);
+    if (m) { m.getElement()?.classList.add('selected'); return; }
+    if (!st.lat || !st.lng) return;
+    // Trạm không thuộc tuyến: vẽ marker tạm
+    state.tempStopMarker = L.marker([st.lat, st.lng], {
+        icon: L.divIcon({
+            className: 'stop-icon selected',
+            html: `<div class="stop-dot"></div><div class="stop-label">${esc(st.name)}</div>`,
+            iconSize: [20, 20], iconAnchor: [10, 10]
+        }),
+        zIndexOffset: 500
+    }).addTo(state.layers.stops);
+}
+
+// Phần tĩnh của thẻ trạm (tên, chiều, nút) — chỉ đổi khi chọn trạm / đổi trạng thái
+function renderFocusStatic() {
+    const st = state.station;
+    if (!st) return;
+    $('focus-name').textContent = st.name || 'Điểm dừng';
+    $('focus-name').title = st.name || '';
+    const dirEl = $('focus-dir');
+    dirEl.className = 'dir-tag ' + (st.dir || '');
+    dirEl.textContent = st.dir ? dirLabel(st.dir) : '';
+    $('focus-route').textContent = st.dir ? `· Tuyến ${state.route.code}` : `Không thuộc tuyến ${state.route.code}`;
+
+    const fav = st.dir && isFav(st.stationId, st.dir);
+    const favBtn = $('btn-focus-fav');
+    favBtn.hidden = !st.dir;
+    favBtn.classList.toggle('on', !!fav);
+    favBtn.textContent = fav ? '★' : '☆';
+
+    const alerting = isAlertingStation(st);
+    const alertBtn = $('btn-focus-alert');
+    alertBtn.hidden = !st.dir;
+    alertBtn.textContent = alerting ? 'Tắt báo' : 'Báo xe đến';
+    alertBtn.classList.toggle('btn-primary', !alerting);
+}
+
+const isAlertingStation = st => !!(state.alert && st && state.alert.station.stationId === st.stationId);
+
+// Phần động (ETA) — cập nhật mỗi giây, chỉ đổi text nên không làm mất thao tác chạm
+function updateFocus() {
+    const st = state.station;
+    if (!st) return;
+    const approaching = [];
+    for (const b of state.buses.values()) {
+        const rel = relToStation(b, st);
+        b.rel = rel;
+        if (rel && !rel.passed) approaching.push(b);
     }
+    approaching.sort((a, b) => a.rel.meters - b.rel.meters);
+    const nearest = approaching[0];
 
-    // 4. Highlight điểm dừng trong danh sách trạm (nếu mở tab trạm)
-    setTimeout(() => {
-        const el = document.getElementById(`station-item-${st.stationId}`);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            el.classList.add('highlight-target');
-            setTimeout(() => el.classList.remove('highlight-target'), 2500);
-        }
-    }, 400);
-
-    // 5. Tự động tính khoảng cách, thời gian và highlight xe gần nhất
-    updateStationFocusUI();
-
-    // 6. Duy trì realtime xe của tuyến chạy liên tục
-    if (currentRoute) {
-        fetchRealtimeBuses();
+    if (!st.dir) {
+        $('focus-eta').textContent = '—';
+        $('focus-detail').textContent = 'Chọn tuyến đi qua trạm này để xem xe';
+    } else if (nearest) {
+        const { meters } = nearest.rel;
+        $('focus-eta').textContent = meters <= 50 ? 'Đang tới' : `${etaMinutes(meters, nearest.speed)} phút`;
+        $('focus-detail').textContent = `${nearest.plate} · cách ${fmtDist(meters)}`;
     } else {
-        fetchRealtimeStationBuses();
+        $('focus-eta').textContent = 'Chưa có xe';
+        $('focus-detail').textContent = `Chưa thấy xe ${dirLabel(st.dir).toLowerCase()} đang tới`;
+    }
+    $('btn-focus-bus').hidden = !nearest;
+
+    const next = approaching[1];
+    $('focus-next').hidden = !next;
+    if (next) $('focus-next').textContent = `Xe sau: ${next.plate} · ${fmtDist(next.rel.meters)} · ~${etaMinutes(next.rel.meters, next.speed)} phút`;
+
+    const plate = nearest ? nearest.plate : null;
+    if (plate !== state.nearestPlate) {
+        const prev = state.buses.get(state.nearestPlate);
+        if (prev) setBusIcon(prev, false);
+        if (nearest) setBusIcon(nearest, true);
+        state.nearestPlate = plate;
     }
 }
 
-window.panToStation = function(lat, lng) {
-    if (lat && lng) {
-        map.setView([lat, lng], 16, { animate: true });
-        closeSidebar();
-    }
-};
+// ==========================================
+// 6. XE ĐANG CHẠY
+// ==========================================
+// Quan hệ giữa xe và trạm: null nếu khác chiều; { passed, meters } nếu cùng chiều
+function relToStation(b, st) {
+    if (!st || !st.dir || dirOfBus(b) !== st.dir) return null;
+    const order = state.orders[st.dir];
+    const nextOrder = order.get(b.nextStationId);
+    if (nextOrder && st.order && nextOrder > st.order) return { passed: true, meters: 0 };
 
-let isFocusCardCollapsed = false;
-let isAlertBannerCollapsed = false;
-let isDepartureBannerCollapsed = false;
-
-// Áp dụng trạng thái thu gọn / mở rộng của thẻ tiêu điểm trạm dừng
-function applyFocusCardCollapsedState() {
-    const card = document.getElementById('station-focus-card');
-    const toggleFocusText = document.getElementById('toggle-focus-text');
-    if (!card) return;
-    if (isFocusCardCollapsed) {
-        card.classList.add('is-collapsed');
-        if (toggleFocusText) toggleFocusText.innerText = '▼ Mở rộng';
-    } else {
-        card.classList.remove('is-collapsed');
-        if (toggleFocusText) toggleFocusText.innerText = '▲ Thu gọn';
+    const geo = state.geo[st.dir];
+    if (geo.path.length && b.s != null) {
+        const stS = Geo.along(geo, st.lat, st.lng);
+        const d = stS - b.s;
+        return d < -20 ? { passed: true, meters: 0 } : { passed: false, meters: Math.max(10, d) };
     }
+    return { passed: false, meters: Geo.distance(b.lat, b.lng, st.lat, st.lng) };
 }
 
-// Tính khoảng cách, ETA và xác định xe gần nhất đối với điểm dừng đang chọn
-function calculateBusesToStation(station) {
-    if (!station || !currentRoute) return { nearestBus: null, approachingBuses: [], targetDir: currentDirection || 'go' };
-
-    const inGo = currentRoute.go && currentRoute.go.stations && currentRoute.go.stations.some(s => s.stationId === station.stationId);
-    const inRet = currentRoute.ret && currentRoute.ret.stations && currentRoute.ret.stations.some(s => s.stationId === station.stationId);
-    let targetDir = station.direction || currentDirection || 'go';
-    if (inRet && !inGo) targetDir = 'ret';
-    else if (inGo && !inRet) targetDir = 'go';
-
-    const isDirGo = (targetDir === 'go');
-    const dirData = isDirGo ? currentRoute.go : currentRoute.ret;
-    const path = dirData ? (dirData.path || []) : [];
-    const stations = dirData ? (dirData.stations || []) : [];
-
-    const targetStation = stations.find(s => s.stationId === station.stationId) || station;
-    const targetStationIdx = stations.findIndex(s => s.stationId === station.stationId);
-    const targetOrder = (typeof targetStation.order === 'number') ? targetStation.order : (targetStationIdx + 1);
-    const targetPathIdx = (path.length > 0 && targetStation.lat && targetStation.lng) 
-        ? findClosestPathIndex(path, targetStation.lat, targetStation.lng) 
-        : -1;
-
-    const approachingBuses = [];
-
-    for (const b of liveActiveBuses.values()) {
-        const busIsGo = (b.isGo !== false);
-        if (busIsGo !== isDirGo) {
-            b.relToStation = { isSameDir: false, hasPassed: false, statusText: 'Chiều ngược lại' };
-            b.isNearest = false;
-            continue;
-        }
-
-        // Xe cùng chiều di chuyển
-        let hasPassed = false;
-
-        // 1. Kiểm tra theo số thứ tự trạm kế tiếp
-        if (b.nextStationId && targetStationIdx !== -1) {
-            const busNextSt = stations.find(s => s.stationId === b.nextStationId);
-            if (busNextSt && typeof busNextSt.order === 'number' && typeof targetOrder === 'number') {
-                if (busNextSt.order > targetOrder) {
-                    hasPassed = true;
-                }
-            }
-        }
-
-        // 2. Kiểm tra theo chỉ số polyline đường đi: Nếu đã vượt qua vị trí trạm trên polyline -> Đã đi qua!
-        let busPathIdx = -1;
-        if (path.length > 0 && b.lat && b.lng) {
-            busPathIdx = findClosestPathIndex(path, b.lat, b.lng);
-            if (targetPathIdx !== -1 && busPathIdx > targetPathIdx) {
-                hasPassed = true;
-            }
-        }
-
-        // 3. Nếu khoảng cách thực tế giữa xe và trạm rất gần (<= 25m) và xe đã ở cuối phân đoạn trạm -> Đã qua!
-        if (!hasPassed && b.lat && b.lng && targetStation.lat && targetStation.lng) {
-            const directDist = getDistance(b.lat, b.lng, targetStation.lat, targetStation.lng);
-            if (directDist <= 25 && targetPathIdx !== -1 && busPathIdx >= targetPathIdx) {
-                hasPassed = true;
-            }
-        }
-
-        // KHI XE ĐÃ QUA ĐIỂM DỪNG: Bỏ chọn canh xe & highlight của xe này ngay lập tức!
-        if (hasPassed) {
-            b.relToStation = { isSameDir: true, hasPassed: true, statusText: 'Đã đi qua trạm này' };
-            b.isNearest = false;
-
-            // Xóa bỏ trạng thái canh xe cũ nếu xe này vừa đi qua
-            if (activeDepartureAlert && activeDepartureAlert.plate === b.plate) {
-                stopDepartureAlert();
-            }
-            if (activeAlert && activeAlert.lastNotifiedPlate === b.plate) {
-                activeAlert.lastNotifiedPlate = null;
-                const bannerStatus = document.getElementById('alert-banner-status');
-                if (bannerStatus) bannerStatus.innerText = 'Đang quét xe tiếp theo đang tới...';
-            }
-            continue;
-        }
-
-        // Xe ĐANG ĐẾN trạm targetStation: tính khoảng cách dọc theo lộ trình
-        let distMeters = 0;
-        if (b.nextStationId === targetStation.stationId && typeof b.partRemained === 'number' && b.partRemained > 0) {
-            distMeters = b.partRemained;
-        } else if (path.length > 0 && busPathIdx !== -1 && targetPathIdx !== -1) {
-            if (busPathIdx >= targetPathIdx) {
-                distMeters = getDistance(b.lat, b.lng, targetStation.lat, targetStation.lng);
-            } else {
-                distMeters = getDistance(b.lat, b.lng, path[busPathIdx][0], path[busPathIdx][1]);
-                for (let i = busPathIdx; i < targetPathIdx; i++) {
-                    distMeters += getDistance(path[i][0], path[i][1], path[i + 1][0], path[i + 1][1]);
-                }
-                distMeters += getDistance(path[targetPathIdx][0], path[targetPathIdx][1], targetStation.lat, targetStation.lng);
-            }
-        } else if (b.lat && b.lng && targetStation.lat && targetStation.lng) {
-            distMeters = getDistance(b.lat, b.lng, targetStation.lat, targetStation.lng);
-        }
-
-        distMeters = Math.max(10, Math.round(distMeters));
-        const speedKmh = (b.speed && b.speed > 5) ? b.speed : 25;
-        const speedMps = Math.max(3.5, speedKmh * 1000 / 3600);
-        const timeSeconds = Math.round(distMeters / speedMps);
-        const etaMinutes = Math.max(1, Math.round(timeSeconds / 60));
-
-        b.relToStation = {
-            isSameDir: true,
-            hasPassed: false,
-            distanceMeters: distMeters,
-            timeSeconds: timeSeconds,
-            etaMinutes: etaMinutes,
-            speedKmh: Math.round(speedKmh)
-        };
-        b.isNearest = false;
-        approachingBuses.push(b);
-    }
-
-    // Sắp xếp các xe đang đến gần nhất lên đầu
-    approachingBuses.sort((a, b) => a.relToStation.distanceMeters - b.relToStation.distanceMeters);
-
-    let nearestBus = null;
-    if (approachingBuses.length > 0) {
-        nearestBus = approachingBuses[0];
-        nearestBus.isNearest = true;
-    }
-
-    return { nearestBus, approachingBuses, targetDir };
+// Đặt vị trí xe theo quãng đường còn lại tới trạm kế tiếp, nội suy dọc lộ trình
+function positionBus(b) {
+    const geo = state.geo[dirOfBus(b)];
+    if (!geo || !geo.path.length || !b.targetLat) { b.s = null; return; }
+    const targetS = Geo.along(geo, b.targetLat, b.targetLng);
+    b.s = targetS - (b.partRemained || 0);
+    const p = Geo.pointAt(geo, b.s);
+    if (p) { b.lat = p.lat; b.lng = p.lng; }
 }
 
-// Cập nhật giao diện Focus Điểm Dừng & Highlight xe gần nhất (Có thu gọn/tối giản & chống đè lặp)
-function updateStationFocusUI() {
-    if (!currentStation || !currentRoute) {
-        const card = document.getElementById('station-focus-card');
-        if (card) card.style.display = 'none';
-        return;
-    }
-
-    const { nearestBus, approachingBuses, targetDir } = calculateBusesToStation(currentStation);
-
-    const card = document.getElementById('station-focus-card');
-    const nameEl = document.getElementById('station-focus-name');
-    const dirEl = document.getElementById('station-focus-dir');
-    const routeTagEl = document.getElementById('station-focus-route-tag');
-    const miniSummaryEl = document.getElementById('station-focus-mini-summary');
-    const contentEl = document.getElementById('station-focus-content');
-
-    // Kiểm tra xem có đang bật cảnh báo cho trạm này không
-    const isAlertingCurrentStation = Boolean(activeAlert && currentStation && (activeAlert.stationId === currentStation.stationId || activeAlert.stationName === currentStation.name));
-
-    // TỐI GIẢN: Nếu đang bật báo cho chính trạm này, ẩn thanh cảnh báo vàng riêng biệt đi để tránh trùng lặp đè lên nhau
-    const alertBannerEl = document.getElementById('alert-banner');
-    if (isAlertingCurrentStation && alertBannerEl) {
-        alertBannerEl.style.display = 'none';
-    }
-
-    if (card && nameEl && dirEl && contentEl) {
-        card.style.display = 'block';
-        applyFocusCardCollapsedState();
-
-        const cleanStationName = (currentStation.name || 'Điểm dừng').replace(/^[0-9A-Z\(\)\s,-]+ - /, '') || currentStation.name;
-        nameEl.innerText = cleanStationName;
-        nameEl.title = currentStation.name || '';
-
-        const isGo = (targetDir === 'go');
-        dirEl.className = `dir-pill ${isGo ? 'pill-go' : 'pill-ret'}`;
-        dirEl.innerText = isGo ? 'Chiều đi' : 'Chiều về';
-        if (routeTagEl) {
-            routeTagEl.innerText = `Tuyến ${currentRoute.code}`;
-        }
-
-        if (nearestBus) {
-            const dText = nearestBus.relToStation.distanceMeters >= 1000 
-                ? (nearestBus.relToStation.distanceMeters / 1000).toFixed(1) + ' km' 
-                : nearestBus.relToStation.distanceMeters + ' m';
-            const tText = (nearestBus.relToStation.distanceMeters <= 50) 
-                ? 'Đang tới trạm' 
-                : `~${nearestBus.relToStation.etaMinutes} phút`;
-
-            if (miniSummaryEl) {
-                miniSummaryEl.innerText = `⭐ ${nearestBus.plate} • ${dText} (~${nearestBus.relToStation.etaMinutes}p)`;
-            }
-
-            let nextBusHint = '';
-            if (approachingBuses.length > 1) {
-                const nextBus = approachingBuses[1];
-                const nextDText = nextBus.relToStation.distanceMeters >= 1000 
-                    ? (nextBus.relToStation.distanceMeters / 1000).toFixed(1) + ' km' 
-                    : nextBus.relToStation.distanceMeters + ' m';
-                nextBusHint = `<div class="next-bus-hint">Xe tiếp theo: <b>${nextBus.plate}</b> (cách ${nextDText}, ~${nextBus.relToStation.etaMinutes} phút)</div>`;
-            }
-
-            // Nút báo xe linh hoạt: Nếu đang báo thì hiện nút Tắt báo, nếu chưa báo thì hiện nút Báo xe đến
-            const alertBtnHtml = isAlertingCurrentStation ? `
-                <button class="btn-focus-action btn-alert-bus" style="background: #475569;" onclick="stopStationAlert()" title="Tắt cảnh báo xe đến trạm này">
-                    🔕 Tắt báo
-                </button>
-            ` : `
-                <button class="btn-focus-action btn-alert-bus" onclick="openAlertModalForStation(${currentStation.stationId}, '${(currentStation.name || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${currentStation.lat}, ${currentStation.lng})" title="Đặt chuông báo khi xe tới">
-                    🔔 Báo xe đến
-                </button>
-            `;
-
-            contentEl.innerHTML = `
-                <div class="station-nearest-box">
-                    <div class="nearest-bus-header">
-                        <span class="nearest-badge">⭐ XE GẦN NHẤT ĐANG TỚI</span>
-                        <div style="display:flex; align-items:center; gap:6px;">
-                            ${isAlertingCurrentStation ? '<span style="background:#ea580c; color:#fff; font-size:10.5px; font-weight:800; padding:2px 6px; border-radius:5px;">🔔 Đang canh</span>' : ''}
-                            <span class="nearest-plate">🚌 ${nearestBus.plate}</span>
-                        </div>
-                    </div>
-                    <div class="nearest-bus-metrics">
-                        <div class="metric-item">
-                            <span class="metric-label">Khoảng cách</span>
-                            <span class="metric-value dist-highlight">${dText}</span>
-                        </div>
-                        <div class="metric-item">
-                            <span class="metric-label">Thời gian đến</span>
-                            <span class="metric-value time-highlight">${tText}</span>
-                        </div>
-                        <div class="metric-item">
-                            <span class="metric-label">Vận tốc</span>
-                            <span class="metric-value">${nearestBus.relToStation.speedKmh} km/h</span>
-                        </div>
-                    </div>
-                    ${nextBusHint}
-                    <div class="nearest-bus-actions">
-                        <button class="btn-focus-action btn-locate-bus" onclick="panToBus('${nearestBus.plate}')" title="Xem xe trên bản đồ">
-                            🎯 Xem xe này
-                        </button>
-                        ${alertBtnHtml}
-                        <button class="btn-focus-action btn-departure-bus" onclick="openDepartureModal('${nearestBus.plate}', '${currentRoute.code}', '${(nearestBus.nextStation || '').replace(/'/g, "\\'")}', ${nearestBus.partRemained || 0}, ${nearestBus.lat}, ${nearestBus.lng})" title="Canh xe xuất bến / di chuyển">
-                            🚀 Canh xe
-                        </button>
-                    </div>
-                </div>
-            `;
-        } else {
-            if (miniSummaryEl) {
-                miniSummaryEl.innerText = `⚠️ Chưa có xe đang đến`;
-            }
-            contentEl.innerHTML = `
-                <div class="station-no-bus">
-                    <span>⚠️ Chưa phát hiện thêm xe nào đang di chuyển tới trạm này ở <b>${isGo ? 'Chiều đi' : 'Chiều về'}</b>.</span>
-                    <button class="btn-focus-action btn-alert-bus" style="padding: 6px 10px; flex-shrink: 0;" onclick="openAlertModalForStation(${currentStation.stationId}, '${(currentStation.name || '').replace(/'/g, "\\'")}', '${currentRoute.code}', ${currentStation.lat}, ${currentStation.lng})">
-                        🔔 Báo khi có xe
-                    </button>
-                </div>
-            `;
-        }
-    }
-
-    // Cập nhật marker trên Leaflet map (phóng to, viền phát sáng, tăng zIndex cho xe gần nhất)
-    for (const b of liveActiveBuses.values()) {
-        if (!b.marker) continue;
-        const isNearest = (b === nearestBus);
-        const busIcon = L.divIcon({
-            className: 'bus-smooth-marker',
-            html: getBusMarkerHtml(b, isNearest),
-            iconSize: isNearest ? [60, 40] : [52, 34],
-            iconAnchor: isNearest ? [30, 20] : [26, 17]
-        });
-        b.marker.setIcon(busIcon);
-        b.marker.setZIndexOffset(isNearest ? 9999 : 2500);
-        updateBusPopup(b.marker, b);
-    }
-
-    // Cập nhật danh sách "Xe đang chạy" trong bottom sheet
-    renderBusCardsList(Array.from(liveActiveBuses.values()));
-}
-
-// Dừng cảnh báo điểm dừng
-window.stopStationAlert = function() {
-    activeAlert = null;
-    const alertBannerEl = document.getElementById('alert-banner');
-    if (alertBannerEl) alertBannerEl.style.display = 'none';
-    stopPhoneRingtone();
-    updateStationFocusUI();
-};
-
-// Hủy chọn trạm
-window.clearStationFocus = function() {
-    currentStation = null;
-    const card = document.getElementById('station-focus-card');
-    if (card) card.style.display = 'none';
-
-    liveActiveBuses.forEach(b => {
-        b.relToStation = null;
-        b.isNearest = false;
-        if (b.marker) {
-            const busIcon = L.divIcon({
-                className: 'bus-smooth-marker',
-                html: getBusMarkerHtml(b, false),
-                iconSize: [52, 34],
-                iconAnchor: [26, 17]
-            });
-            b.marker.setIcon(busIcon);
-            b.marker.setZIndexOffset(2500);
-            updateBusPopup(b.marker, b);
-        }
+function busIcon(b, nearest) {
+    const [w, h] = nearest ? BUS_SIZE_NEAREST : BUS_SIZE;
+    return L.divIcon({
+        className: `bus-icon${nearest ? ' nearest' : ''}`,
+        html: `<img src="${b.isGo === false ? 'bus_real_ret.png' : 'bus_real_go.png'}" alt="" draggable="false">`,
+        iconSize: [w, h],
+        iconAnchor: [w / 2, h / 2]
     });
-
-    renderBusCardsList(Array.from(liveActiveBuses.values()));
-};
-
-// Helper: Render Bus Cards List in Bottom Sheet (Hiển thị phân biệt Chiều đi / Chiều về + Nút Canh xe xuất bến + Ưu tiên xe gần trạm)
-function renderBusCardsList(allBuses) {
-    if (!allBuses || allBuses.length === 0) {
-        realtimeBusList.innerHTML = `<div class="empty-hint">Hiện chưa quét được xe buýt nào đang gửi tín hiệu GPS. Hệ thống đang tiếp tục quét mỗi 4 giây...</div>`;
-        return;
-    }
-
-    let sortedBuses = [...allBuses];
-    if (currentStation) {
-        sortedBuses.sort((a, b) => {
-            const aApp = a.relToStation && a.relToStation.isSameDir && !a.relToStation.hasPassed;
-            const bApp = b.relToStation && b.relToStation.isSameDir && !b.relToStation.hasPassed;
-            if (aApp && !bApp) return -1;
-            if (!aApp && bApp) return 1;
-            if (aApp && bApp) {
-                return (a.relToStation.distanceMeters || 0) - (b.relToStation.distanceMeters || 0);
-            }
-            return 0;
-        });
-    }
-
-    realtimeBusList.innerHTML = sortedBuses.map(b => {
-        const isGo = b.isGo !== false;
-        const dirClass = isGo ? 'pill-go' : 'pill-ret';
-        const dirLabel = isGo ? '➜ Chiều đi' : '⬅ Chiều về';
-        const isNearest = (b.isNearest === true);
-
-        let proximityHtml = `
-            <div class="bus-proximity-stats" style="text-align: right;">
-                <div class="bus-distance">${b.partRemained >= 1000 ? (b.partRemained/1000).toFixed(1) + ' km' : Math.round(b.partRemained || 0) + ' m'}</div>
-                <div class="bus-eta">còn ~${Math.max(1, Math.round((b.timeRemained || 0)/60))} phút</div>
-            </div>
-        `;
-
-        if (currentStation && b.relToStation) {
-            if (b.relToStation.isSameDir) {
-                if (b.relToStation.hasPassed) {
-                    proximityHtml = `
-                        <div class="bus-proximity-stats" style="text-align: right;">
-                            <div style="font-size: 11px; color: #dc2626; font-weight: 700;">Đã qua trạm này</div>
-                        </div>
-                    `;
-                } else {
-                    const dText = b.relToStation.distanceMeters >= 1000 
-                        ? (b.relToStation.distanceMeters / 1000).toFixed(1) + ' km' 
-                        : b.relToStation.distanceMeters + ' m';
-                    proximityHtml = `
-                        <div class="bus-proximity-stats" style="text-align: right;">
-                            <div class="bus-distance" style="color: ${isNearest ? '#d97706' : '#2563eb'}; font-size: 14px;">${dText}</div>
-                            <div class="bus-eta" style="font-weight: 700;">~${b.relToStation.etaMinutes} phút</div>
-                        </div>
-                    `;
-                }
-            } else {
-                proximityHtml = `
-                    <div class="bus-proximity-stats" style="text-align: right;">
-                        <div style="font-size: 11px; color: #64748b; font-weight: 600;">Chiều ngược lại</div>
-                    </div>
-                `;
-            }
-        }
-
-        return `
-            <div class="bus-card ${isNearest ? 'bus-card-nearest' : ''}" onclick="panToStation(${b.lat}, ${b.lng})">
-                <div class="bus-plate-wrap">
-                    <div class="bus-plate-icon">${getBusSvgIcon(isNearest ? '#d97706' : (isGo ? '#0284c7' : '#ea580c'), 22)}</div>
-                    <div>
-                        <div class="bus-plate-title" style="display:flex; align-items:center; gap:6px; flex-wrap: wrap;">
-                            <span>${b.plate}</span>
-                            <span class="dir-pill ${dirClass}">${dirLabel}</span>
-                            ${isNearest ? '<span class="bus-card-nearest-badge">⭐ XE GẦN NHẤT</span>' : ''}
-                        </div>
-                        <div class="bus-route-direction">${b.directionText || b.fleetCode || ('Tuyến ' + b.fleet)}</div>
-                        <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">Trạm tiếp theo: ${b.nextStation || 'Dọc tuyến'}</div>
-                    </div>
-                </div>
-                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                    ${proximityHtml}
-                    <button class="btn-bus-departure" onclick="event.stopPropagation(); openDepartureModal('${b.plate}', '${b.fleet || (currentRoute ? currentRoute.code : '')}', '${(b.nextStation || 'Bến xe').replace(/'/g, "\\'")}', ${b.partRemained || 0}, ${b.lat}, ${b.lng})">
-                        🚀 Canh xe chạy
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
 }
 
-// 1-Second Smooth Animation Tick Loop (Di chuyển xe mượt mà dọc tuyến mỗi giây)
-function tickRealtimeBusesEverySecond() {
-    if (liveActiveBuses.size === 0) return;
-
-    for (const b of liveActiveBuses.values()) {
-        if (!b.marker) continue;
-
-        // Path to glide along
-        const path = (b.path && b.path.length > 1) ? b.path : 
-                     (currentRoute ? (b.isGo ? currentRoute.go.path : currentRoute.ret.path) : null);
-        if (!path || path.length < 2) continue;
-
-        // Target coordinates to measure distance from
-        const targetLat = b.targetLat || (currentStation ? currentStation.lat : b.lat);
-        const targetLng = b.targetLng || (currentStation ? currentStation.lng : b.lng);
-
-        // If distance is almost 0, don't overshoot
-        if (typeof b.partRemained === 'number' && b.partRemained > 15) {
-            // Speed in m/s (default ~28 km/h = 7.7 m/s)
-            const speedKmh = (b.speed && b.speed > 5) ? b.speed : 28;
-            const metersPerSec = Math.max(3, Math.min(14, speedKmh * 1000 / 3600));
-
-            b.partRemained = Math.max(0, b.partRemained - metersPerSec);
-            if (b.timeRemained > 0) {
-                b.timeRemained = Math.max(0, b.timeRemained - 1);
-            }
-
-            // Interpolate new position along polyline
-            const newPos = interpolatePositionBackwards(path, targetLat, targetLng, b.partRemained);
-            b.lat = newPos.lat;
-            b.lng = newPos.lng;
-            b.bearing = newPos.bearing;
-
-            // Smooth glide marker with CSS transform transition 0.95s
-            b.marker.setLatLng([newPos.lat, newPos.lng]);
-        }
-
-        // Kiểm tra điều kiện xe xuất bến / bắt đầu di chuyển
-        checkDepartureCondition(b);
-
-        // Kiểm tra điều kiện xe đến gần trạm cảnh báo (mỗi giây)
-        checkProximityAlertLocal(b);
-    }
-
-    // Tự động cập nhật khoảng cách & thời gian đếm lùi tới trạm đang chọn mỗi giây
-    if (currentStation) {
-        updateStationFocusUI();
-    }
+function setBusIcon(b, nearest) {
+    if (!b.marker || b.nearest === nearest) return;
+    b.nearest = nearest;
+    b.marker.setIcon(busIcon(b, nearest));
+    b.marker.setZIndexOffset(nearest ? 1000 : 0);
 }
 
-// Realtime Tracking Polling
-function startRealtimeTracking(type = 'route') {
-    if (realtimeInterval) clearInterval(realtimeInterval);
-    if (busSecondTimer) clearInterval(busSecondTimer);
-
-    // Bắt đầu nhịp animation di chuyển xe mỗi giây
-    busSecondTimer = setInterval(tickRealtimeBusesEverySecond, 1000);
-
-    if (type === 'route') {
-        fetchRealtimeBuses();
-        realtimeInterval = setInterval(fetchRealtimeBuses, 4000);
-    } else if (type === 'station') {
-        fetchRealtimeStationBuses();
-        realtimeInterval = setInterval(fetchRealtimeStationBuses, 4000);
+function busPopupHtml(b) {
+    const rel = state.station && relToStation(b, state.station);
+    let relLine = '';
+    if (rel) {
+        relLine = rel.passed
+            ? `<div class="popup-line">Đã qua ${esc(state.station.name)}</div>`
+            : `<div class="popup-line">Tới ${esc(state.station.name)}: <b>${fmtDist(rel.meters)}</b> (~${etaMinutes(rel.meters, b.speed)} phút)</div>`;
     }
+    return `
+        <div class="popup">
+            <div class="popup-title">${esc(b.plate)}</div>
+            <div class="popup-line"><span class="dir-tag ${dirOfBus(b)}">${esc(b.directionText || dirLabel(dirOfBus(b)))}</span></div>
+            <div class="popup-line">Trạm kế: ${esc(b.nextStation || '—')} · ${fmtDist(b.partRemained)}</div>
+            ${relLine}
+            <button class="btn" data-action="departure" data-plate="${esc(b.plate)}">Canh xe này xuất bến</button>
+        </div>`;
 }
 
-// Fetch realtime buses for an entire route (Hiển thị tất cả xe đang lưu thông trên làn đường)
-async function fetchRealtimeBuses() {
-    if (!currentRoute) return;
+function clearBuses() {
+    state.layers.buses.clearLayers();
+    state.buses.clear();
+    state.nearestPlate = null;
+    updateBusCount(0);
+}
 
+function updateBusCount(n) {
+    $('bus-count').textContent = n;
+    $('fab-bus-count').textContent = n;
+    $('fab-bus-count').hidden = n === 0;
+}
+
+let pollTimer = null;
+let tickTimer = null;
+function startPolling() {
+    clearInterval(pollTimer);
+    clearInterval(tickTimer);
+    refreshBuses();
+    pollTimer = setInterval(refreshBuses, POLL_MS);
+    tickTimer = setInterval(tick, 1000);
+}
+
+let refreshing = false;
+async function refreshBuses() {
+    if (!state.route || refreshing) return;
+    refreshing = true;
+    const code = state.route.code;
     try {
-        const res = await fetch(`/api/realtime/route/${encodeURIComponent(currentRoute.code)}`);
-        const json = await res.json();
-        if (!json.success) return;
-
-        const allBuses = json.buses || [];
-        busCountSpan.innerText = allBuses.length;
-        if (floatingBusCount) floatingBusCount.innerText = allBuses.length + ' xe';
-
-        const activePlates = new Set();
-        allBuses.forEach(b => {
-            if (!b.lat || !b.lng) return;
-            const plateKey = String(b.plate || '').trim();
-            activePlates.add(plateKey);
-
-            if (liveActiveBuses.has(plateKey)) {
-                // Cập nhật vị trí và thông tin xe hiện hữu
-                const existing = liveActiveBuses.get(plateKey);
-                existing.partRemained = b.partRemained;
-                existing.timeRemained = b.timeRemained;
-                existing.speed = b.speed;
-                existing.targetLat = b.targetLat;
-                existing.targetLng = b.targetLng;
-                existing.path = (b.path && b.path.length > 0) ? b.path : existing.path;
-                existing.nextStation = b.nextStation;
-                existing.directionText = b.directionText;
-                existing.isGo = b.isGo;
-
-                if (existing.marker) {
-                    existing.marker.setLatLng([b.lat, b.lng]);
-                    updateBusPopup(existing.marker, existing);
-                }
-                checkDepartureCondition(existing);
-                checkProximityAlertLocal(existing);
-            } else {
-                // Tạo marker mới cho xe vừa xuất hiện
-                const m = createBusMarker(b);
-                busMarkersLayer.addLayer(m);
-                b.marker = m;
-                liveActiveBuses.set(plateKey, b);
-                checkDepartureCondition(b);
-                checkProximityAlertLocal(b);
-            }
-        });
-
-        // Xóa những xe không còn phát tín hiệu
-        for (const [plate, b] of liveActiveBuses.entries()) {
-            if (!activePlates.has(plate)) {
-                if (b.marker) busMarkersLayer.removeLayer(b.marker);
-                liveActiveBuses.delete(plate);
-            }
-        }
-
-        if (currentStation) {
-            updateStationFocusUI();
-        } else {
-            renderBusCardsList(Array.from(liveActiveBuses.values()));
-        }
-
+        const json = await getJson(`/api/realtime/route/${encodeURIComponent(code)}`);
+        if (!json.success || !state.route || state.route.code !== code) return;
+        applyBuses(json.buses || []);
     } catch (e) {
         console.warn('Realtime fetch failed:', e);
+    } finally {
+        refreshing = false;
     }
 }
 
-// Fetch realtime buses for a specific Station (e.g. Chợ Gạo)
-async function fetchRealtimeStationBuses() {
-    if (!currentStation) return;
+function applyBuses(list) {
+    const seen = new Set();
+    for (const data of list) {
+        if (!data.lat || !data.lng || !data.plate) continue;
+        seen.add(data.plate);
+        let b = state.buses.get(data.plate);
+        const dirChanged = b && b.isGo !== data.isGo;
+        if (!b) {
+            b = { ...data };
+            state.buses.set(b.plate, b);
+        } else {
+            Object.assign(b, data);
+        }
+        positionBus(b);
+        if (!b.marker) {
+            b.nearest = false;
+            b.marker = L.marker([b.lat, b.lng], { icon: busIcon(b, false) })
+                .bindPopup(() => busPopupHtml(b), { offset: [0, -10] })
+                .addTo(state.layers.buses);
+        } else {
+            b.marker.setLatLng([b.lat, b.lng]);
+            if (dirChanged) { b.nearest = null; setBusIcon(b, b.plate === state.nearestPlate); }
+        }
+        checkDeparture(b);
+    }
+    for (const [plate, b] of state.buses) {
+        if (seen.has(plate)) continue;
+        state.layers.buses.removeLayer(b.marker);
+        state.buses.delete(plate);
+        if (state.nearestPlate === plate) state.nearestPlate = null;
+    }
+    updateBusCount(state.buses.size);
+    updateFocus();
+    checkAlertLocal();
+    renderBusList();
+}
 
+// Mỗi giây: cho xe đang chạy tiến dần theo vận tốc báo về (xe đứng yên thì giữ nguyên)
+function tick() {
+    for (const b of state.buses.values()) {
+        if (!(b.speed > 3) || !(b.partRemained > 15) || b.s == null) continue;
+        b.partRemained = Math.max(0, b.partRemained - Math.min(14, (b.speed * 1000) / 3600));
+        if (b.timeRemained > 0) b.timeRemained--;
+        positionBus(b);
+        b.marker.setLatLng([b.lat, b.lng]);
+    }
+    updateFocus();
+    checkAlertLocal();
+}
+
+function renderBusList() {
+    if (!$('sheet').classList.contains('open') || !$('pane-buses').classList.contains('active')) return;
+    const st = state.station;
+    const buses = [...state.buses.values()].map(b => ({ b, rel: st ? relToStation(b, st) : null }));
+    const rank = x => (x.rel && !x.rel.passed ? 0 : x.rel ? 1 : 2);
+    buses.sort((x, y) => rank(x) - rank(y) || (x.rel?.meters || 0) - (y.rel?.meters || 0));
+
+    $('pane-buses').innerHTML = buses.length ? buses.map(({ b, rel }) => {
+        let side = `<b>${fmtDist(b.partRemained)}</b><small>tới trạm kế</small>`;
+        if (st) {
+            if (!rel) side = '<small>Ngược chiều</small>';
+            else if (rel.passed) side = '<small>Đã qua trạm</small>';
+            else side = `<b>${etaMinutes(rel.meters, b.speed)} phút</b><small>${fmtDist(rel.meters)}</small>`;
+        }
+        return `
+        <div class="row${b.plate === state.nearestPlate ? ' hl' : ''}" data-action="bus" data-plate="${esc(b.plate)}">
+            <span class="dot ${dirOfBus(b)}"></span>
+            <div class="row-main">
+                <div class="row-title">${esc(b.plate)}</div>
+                <div class="row-sub">→ ${esc(b.nextStation || 'Dọc tuyến')}</div>
+            </div>
+            <div class="row-side">${side}</div>
+        </div>`;
+    }).join('') : '<div class="empty">Chưa thấy xe nào đang chạy. Tự động cập nhật mỗi 4 giây.</div>';
+}
+
+function focusBus(plate) {
+    const b = state.buses.get(plate);
+    if (!b) return;
+    if (!isDesktop()) closeSheet();
+    state.map.setView([b.lat, b.lng], 16);
+    setTimeout(() => b.marker.openPopup(), 250);
+}
+
+// ==========================================
+// 7. ÂM THANH, RUNG, THÔNG BÁO, CUỘC GỌI MÔ PHỎNG
+// ==========================================
+let audioCtx = null;
+let ringTimer = null;
+let ringStopTimer = null;
+
+function ensureAudio() {
     try {
-        const res = await fetch(`/api/realtime/station/${currentStation.stationId}`);
-        const json = await res.json();
-        if (!json.success) return;
-
-        const buses = json.buses || [];
-        busCountSpan.innerText = buses.length;
-        if (floatingBusCount) floatingBusCount.innerText = buses.length + ' xe';
-
-        const activePlates = new Set();
-        buses.forEach(b => {
-            if (!b.lat || !b.lng) return;
-            const plateKey = String(b.plate || b.BienKiemSoat || '').trim();
-            activePlates.add(plateKey);
-
-            if (liveActiveBuses.has(plateKey)) {
-                const existing = liveActiveBuses.get(plateKey);
-                existing.partRemained = b.partRemained || b.PartRemained;
-                existing.timeRemained = b.timeRemained || b.TimeRemained;
-                existing.speed = b.speed || b.Speed;
-                existing.isGo = b.isGo;
-                existing.directionText = b.directionText;
-                if (existing.marker) {
-                    existing.marker.setLatLng([b.lat, b.lng]);
-                    updateBusPopup(existing.marker, existing);
-                }
-            } else {
-                const m = createBusMarker(b);
-                busMarkersLayer.addLayer(m);
-                b.marker = m;
-                liveActiveBuses.set(plateKey, b);
-            }
-        });
-
-        for (const [plate, b] of liveActiveBuses.entries()) {
-            if (!activePlates.has(plate)) {
-                if (b.marker) busMarkersLayer.removeLayer(b.marker);
-                liveActiveBuses.delete(plate);
-            }
-        }
-
-        if (currentStation) {
-            updateStationFocusUI();
-        } else {
-            renderBusCardsList(Array.from(liveActiveBuses.values()));
-        }
-
-    } catch (e) {
-        console.warn('Station buses fetch failed:', e);
-    }
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch { audioCtx = null; }
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
 }
 
-// ==========================================
-// 3. PROXIMITY ALERT ENGINE
-// ==========================================
-window.openAlertModalForStation = function(stationId, stationName, routeCode = '', lat = 0, lng = 0) {
-    let stationIsGo = null;
-    let stationOrder = null;
-
-    if (currentRoute) {
-        if (!routeCode) routeCode = currentRoute.code;
-        const goStations = (currentRoute.go && currentRoute.go.stations) || [];
-        const retStations = (currentRoute.ret && currentRoute.ret.stations) || [];
-
-        if (currentDirection === 'go') {
-            const foundGo = goStations.find(s => s.stationId === stationId);
-            if (foundGo) {
-                stationIsGo = true;
-                stationOrder = foundGo.order;
-                if (!lat || !lng) { lat = foundGo.lat; lng = foundGo.lng; }
-            } else {
-                const foundRet = retStations.find(s => s.stationId === stationId);
-                if (foundRet) {
-                    stationIsGo = false;
-                    stationOrder = foundRet.order;
-                    if (!lat || !lng) { lat = foundRet.lat; lng = foundRet.lng; }
-                }
-            }
-        } else {
-            const foundRet = retStations.find(s => s.stationId === stationId);
-            if (foundRet) {
-                stationIsGo = false;
-                stationOrder = foundRet.order;
-                if (!lat || !lng) { lat = foundRet.lat; lng = foundRet.lng; }
-            } else {
-                const foundGo = goStations.find(s => s.stationId === stationId);
-                if (foundGo) {
-                    stationIsGo = true;
-                    stationOrder = foundGo.order;
-                    if (!lat || !lng) { lat = foundGo.lat; lng = foundGo.lng; }
-                }
-            }
+function startRingtone(maxMs = 30000) {
+    stopRingtone();
+    ensureAudio();
+    if (!audioCtx) return;
+    const burst = () => {
+        const t = audioCtx.currentTime;
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.35, t + 0.05);
+        gain.gain.setValueAtTime(0.35, t + 1.6);
+        gain.gain.linearRampToValueAtTime(0.001, t + 1.8);
+        gain.connect(audioCtx.destination);
+        for (const f of [440, 480]) {
+            const o = audioCtx.createOscillator();
+            o.frequency.value = f;
+            o.connect(gain);
+            o.start(t);
+            o.stop(t + 1.8);
         }
-    }
-
-    pendingAlert = { stationId, stationName, routeCode, lat, lng, isGo: stationIsGo, stationOrder: stationOrder };
-
-    const dirTag = stationIsGo === true ? ' [Chiều đi]' : (stationIsGo === false ? ' [Chiều về]' : '');
-    modalRouteName.innerText = routeCode ? `Tuyến ${routeCode}${dirTag}` : 'Tất cả các tuyến qua trạm';
-    modalStationName.innerText = stationName || `Trạm ID: ${stationId}`;
-    alertModal.style.display = 'flex';
-
-    requestNotificationPermission();
-    if (!ringtoneAudioCtx) {
-        ringtoneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-};
-
-modalCloseBtn.addEventListener('click', () => alertModal.style.display = 'none');
-btnCancelModal.addEventListener('click', () => alertModal.style.display = 'none');
-
-btnTestAlertSound.addEventListener('click', () => {
-    startPhoneRingtone();
-    triggerVibration();
-    const testFleet = (pendingAlert && pendingAlert.routeCode) ? pendingAlert.routeCode : (currentRoute ? currentRoute.code : '83');
-    const testStation = pendingAlert ? pendingAlert.stationName : 'Điểm dừng đã chọn';
-    showIncomingCall(
-        '29E-95794',
-        testFleet,
-        `Cách trạm ~250m (~1 phút)!`,
-        `Thông báo: Xe buýt biển số 29E-95794 tuyến ${testFleet} đang cách điểm dừng ${testStation} khoảng 250 mét, sắp tới nơi. Quý khách vui lòng chuẩn bị đón xe!`
-    );
-});
-
-btnActivateAlert.addEventListener('click', () => {
-    if (!pendingAlert) return;
-
-    activeAlert = {
-        routeCode: pendingAlert.routeCode,
-        stationId: pendingAlert.stationId,
-        stationName: pendingAlert.stationName,
-        stationLat: pendingAlert.lat,
-        stationLng: pendingAlert.lng,
-        isGo: pendingAlert.isGo,
-        stationOrder: pendingAlert.stationOrder,
-        maxDistance: parseInt(alertDistanceSelect.value, 10),
-        call: chkCall ? chkCall.checked : true,
-        sound: chkSound.checked,
-        vibrate: chkVibrate.checked,
-        notify: chkNotification.checked,
-        lastNotifiedPlate: null
     };
-
-    alertModal.style.display = 'none';
-
-    const isAlertingCur = Boolean(currentStation && (activeAlert.stationId === currentStation.stationId || activeAlert.stationName === currentStation.name));
-    if (isAlertingCur) {
-        alertBanner.style.display = 'none';
-    } else {
-        alertBanner.style.display = 'flex';
-    }
-    updateStationFocusUI();
-
-    const dirTag = activeAlert.isGo === true ? ' [Chiều đi]' : (activeAlert.isGo === false ? ' [Chiều về]' : '');
-    alertBannerStation.innerText = `Đang canh xe ${activeAlert.routeCode ? 'Tuyến ' + activeAlert.routeCode : ''}${dirTag} tại: ${activeAlert.stationName}`;
-    alertBannerStatus.innerText = `Cảnh báo khi xe cùng chiều cách < ${activeAlert.maxDistance >= 1000 ? (activeAlert.maxDistance/1000) + 'km' : activeAlert.maxDistance + 'm'}`;
-
-    // Kiểm tra ngay lập tức các xe đang có trên bản đồ
-    for (const b of liveActiveBuses.values()) {
-        checkProximityAlertLocal(b);
-    }
-    checkStationAlert();
-});
-
-btnStopAlert.addEventListener('click', stopStationAlert);
-
-// Kiểm tra điều kiện xe buýt đến gần trạm cảnh báo (chạy mỗi giây trực tiếp trên client)
-function checkProximityAlertLocal(b) {
-    if (!activeAlert) return;
-    const bFleet = String(b.fleet || '').trim();
-    if (activeAlert.routeCode && bFleet.toLowerCase() !== String(activeAlert.routeCode).trim().toLowerCase()) return;
-
-    // 1. FILTER CHIỀU: Tuyệt đối chỉ cảnh báo xe đang chạy CÙNG CHIỀU với điểm dừng đã chọn!
-    if (typeof activeAlert.isGo === 'boolean' && typeof b.isGo === 'boolean') {
-        if (b.isGo !== activeAlert.isGo) return; // Khác chiều -> Bỏ qua ngay lập tức!
-    }
-
-    // 2. FILTER ĐÃ QUA ĐIỂM: Bỏ qua xe đã đi qua trạm cảnh báo!
-    if (currentRoute && typeof activeAlert.stationOrder === 'number' && b.nextStationId) {
-        const stList = b.isGo ? (currentRoute.go ? currentRoute.go.stations : []) : (currentRoute.ret ? currentRoute.ret.stations : []);
-        const busNextSt = stList.find(s => s.stationId === b.nextStationId);
-        if (busNextSt && typeof busNextSt.order === 'number') {
-            if (busNextSt.order > activeAlert.stationOrder) {
-                // Trạm tiếp theo của xe đã vượt quá trạm cảnh báo -> Xe ĐÃ ĐI QUA TRẠM -> Bỏ qua!
-                return;
-            }
-        }
-    }
-
-    let distMeters = Infinity;
-    if (b.relToStation && b.relToStation.isSameDir) {
-        if (b.relToStation.hasPassed) return;
-        if (typeof b.relToStation.distanceMeters === 'number') {
-            distMeters = b.relToStation.distanceMeters;
-        }
-    } else if (b.nextStationId === activeAlert.stationId && typeof b.partRemained === 'number') {
-        distMeters = b.partRemained;
-    } else if (b.lat && b.lng && activeAlert.stationLat && activeAlert.stationLng) {
-        distMeters = getDistance(b.lat, b.lng, activeAlert.stationLat, activeAlert.stationLng);
-    }
-
-    if (distMeters <= activeAlert.maxDistance) {
-        triggerStationProximityAlert({
-            fleet: bFleet || activeAlert.routeCode,
-            plate: b.plate,
-            distance: Math.round(distMeters),
-            timeRemained: b.timeRemained || Math.round((distMeters / 300) * 60)
-        });
-    }
+    burst();
+    ringTimer = setInterval(burst, 2800);
+    ringStopTimer = setTimeout(stopRingtone, maxMs);
 }
 
-function triggerStationProximityAlert({ fleet, plate, distance, timeRemained }) {
-    if (!activeAlert) return;
-    const etaMinutes = Math.max(1, Math.round((timeRemained || 60) / 60));
-
-    alertBannerStatus.innerHTML = `⚠️ <b style="color: #d32f2f;">XE SẮP TỚI!</b> Tuyến <b>${fleet}</b> (${plate}) cách ${distance}m (~${etaMinutes} phút)!`;
-
-    if (activeAlert.lastNotifiedPlate !== plate) {
-        activeAlert.lastNotifiedPlate = plate;
-
-        if (activeAlert.sound) startPhoneRingtone();
-        if (activeAlert.vibrate) triggerVibration();
-
-        if (activeAlert.notify && 'Notification' in window && Notification.permission === 'granted') {
-            new Notification(`Xe Buýt Tuyến ${fleet} Sắp Đến Trạm!`, {
-                body: `Xe mang biển số ${plate} hiện chỉ còn cách bạn ${distance} mét (~${etaMinutes} phút). Chuẩn bị ra đón xe!`,
-                icon: 'icon.png'
-            });
-        }
-
-        if (activeAlert.call) {
-            showIncomingCall(
-                plate,
-                fleet,
-                `Cách trạm ~${distance}m (~${etaMinutes} phút)!`,
-                `Thông báo: Xe buýt biển số ${plate} tuyến ${fleet} đang cách điểm dừng ${activeAlert.stationName} ${distance} mét, khoảng ${etaMinutes} phút nữa sẽ tới nơi. Quý khách vui lòng chuẩn bị đón xe!`
-            );
-        } else {
-            alert(`🔔 CẢNH BÁO XE BUÝT SẮP ĐẾN!\n\nXe Tuyến ${fleet} (Biển số: ${plate}) đang cách trạm ${distance} mét (~${etaMinutes} phút)!\nHãy chuẩn bị ra đón xe.`);
-        }
-    }
+function stopRingtone() {
+    clearInterval(ringTimer);
+    clearTimeout(ringStopTimer);
+    ringTimer = ringStopTimer = null;
 }
 
-// Periodic Station Alert Check
-setInterval(checkStationAlert, 5000);
+function vibrate() {
+    try { navigator.vibrate?.([500, 200, 500, 200, 500]); } catch { /* không hỗ trợ */ }
+}
 
-async function checkStationAlert() {
-    if (!activeAlert) return;
-
+async function notify(title, body) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const opts = { body, icon: 'icon.png', tag: 'timbus', renotify: true, vibrate: [500, 200, 500] };
     try {
-        const res = await fetch(`/api/realtime/station/${activeAlert.stationId}?fleet=${encodeURIComponent(activeAlert.routeCode || '')}`);
-        const json = await res.json();
-        if (!json.success || !Array.isArray(json.buses)) return;
+        // Android chỉ cho hiện thông báo qua service worker
+        const reg = await navigator.serviceWorker?.getRegistration();
+        if (reg) return reg.showNotification(title, opts);
+        new Notification(title, opts);
+    } catch { /* trình duyệt không hỗ trợ */ }
+}
 
-        const incomingBuses = json.buses;
-        let matchedBus = null;
+function speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'vi-VN';
+    const vi = speechSynthesis.getVoices().find(v => /vi/i.test(v.lang));
+    if (vi) u.voice = vi;
+    speechSynthesis.speak(u);
+}
 
-        for (const b of incomingBuses) {
-            const bFleet = String(b.fleet || b.Fleet || '').trim();
-            if (activeAlert.routeCode && bFleet.toLowerCase() !== activeAlert.routeCode.toLowerCase()) continue;
+let callVoice = '';
+function showCall(plate, sub, voice) {
+    callVoice = voice;
+    $('call-name').textContent = `Xe ${plate}`;
+    $('call-sub').textContent = sub;
+    $('call-status').textContent = 'Đang đổ chuông...';
+    $('call-overlay').classList.remove('active');
+    $('call-overlay').hidden = false;
+}
 
-            // 1. FILTER CHIỀU: Tuyệt đối chỉ xét xe cùng chiều với điểm dừng đã chọn
-            if (typeof activeAlert.isGo === 'boolean' && typeof b.isGo === 'boolean') {
-                if (b.isGo !== activeAlert.isGo) continue;
-            }
+function answerCall() {
+    stopRingtone();
+    $('call-overlay').classList.add('active');
+    $('call-status').textContent = 'Đang nghe...';
+    speak(callVoice);
+}
 
-            const bDist = (typeof b.partRemained === 'number') ? b.partRemained : 
-                          ((typeof b.PartRemained === 'number') ? b.PartRemained : Infinity);
+function endCall() {
+    stopRingtone();
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    $('call-overlay').hidden = true;
+}
 
-            if (bDist <= activeAlert.maxDistance) {
-                matchedBus = {
-                    fleet: bFleet || activeAlert.routeCode,
-                    plate: b.plate || b.BienKiemSoat || b.plateNum || '',
-                    distance: Math.round(bDist),
-                    timeRemained: b.timeRemained || b.TimeRemained || 60
-                };
-                break;
-            }
+// Phát cảnh báo theo cấu hình người dùng chọn
+function fireAlert(opts, { plate, title, body, sub, voice }) {
+    if (opts.sound) startRingtone();
+    if (opts.vibrate) vibrate();
+    notify(title, body);
+    if (opts.call) showCall(plate, sub, voice);
+    else toast(`🔔 ${title}`, 8000);
+}
+
+// ==========================================
+// 8. CẢNH BÁO: XE SẮP ĐẾN TRẠM & XE XUẤT BẾN
+// ==========================================
+function openAlertModal(mode, target) {
+    state.modal = { mode, target };
+    const isStation = mode === 'station';
+    $('alert-modal-title').textContent = isStation ? 'Báo khi xe sắp đến' : 'Canh xe xuất bến';
+    $('alert-modal-target').textContent = isStation
+        ? `${target.name} · Tuyến ${state.route.code} · ${dirLabel(target.dir)}`
+        : `Xe ${target.plate} · Tuyến ${target.fleet}. Báo ngay khi xe bắt đầu chạy.`;
+    $('distance-field').hidden = !isStation;
+    $('btn-test-alert').hidden = !!localStorage.getItem(KEY.ringTested); // chỉ cần thử lần đầu
+    $('alert-modal').hidden = false;
+    ensureAudio();
+}
+
+function closeAlertModal() {
+    $('alert-modal').hidden = true;
+    state.modal = null;
+}
+
+function activateAlert() {
+    const m = state.modal;
+    if (!m) return;
+    const opts = { call: $('chk-call').checked, sound: $('chk-sound').checked, vibrate: $('chk-vibrate').checked };
+    closeAlertModal();
+
+    if (m.mode === 'station') {
+        state.alert = { ...opts, routeCode: state.route.code, station: m.target, maxDistance: +$('alert-distance').value, notifiedPlate: null };
+        setAlertStatus();
+        renderFocusStatic();
+        checkAlertLocal();
+        pollAlertStation();
+    } else {
+        const b = m.target;
+        state.departure = { ...opts, plate: b.plate, fleet: b.fleet, lat: b.lat, lng: b.lng };
+        $('status-departure-text').textContent = `🚀 Đang canh xe ${b.plate} xuất bến`;
+        $('status-departure').classList.remove('hot');
+        $('status-departure').hidden = false;
+        toast('Sẽ báo ngay khi xe bắt đầu chạy');
+    }
+}
+
+function setAlertStatus(hotText) {
+    const a = state.alert;
+    const el = $('status-alert');
+    el.hidden = !a;
+    if (!a) return;
+    el.classList.toggle('hot', !!hotText);
+    $('status-alert-text').textContent = hotText || `🔔 ${a.station.name} · báo khi < ${fmtDist(a.maxDistance)}`;
+}
+
+function stopAlert() {
+    state.alert = null;
+    stopRingtone();
+    setAlertStatus();
+    renderFocusStatic();
+}
+
+function stopDeparture() {
+    state.departure = null;
+    stopRingtone();
+    $('status-departure').hidden = true;
+}
+
+// Kiểm tra trên client (mỗi giây) với các xe đang hiển thị
+function checkAlertLocal() {
+    const a = state.alert;
+    if (!a || !state.route || String(state.route.code) !== String(a.routeCode)) return;
+    let best = null;
+    for (const b of state.buses.values()) {
+        const rel = relToStation(b, a.station);
+        if (b.plate === a.notifiedPlate && rel && rel.passed) {
+            a.notifiedPlate = null; // xe đã báo đã qua trạm -> canh xe tiếp theo
+            setAlertStatus();
         }
-
-        if (matchedBus) {
-            triggerStationProximityAlert(matchedBus);
-        } else if (!activeAlert.lastNotifiedPlate) {
-            alertBannerStatus.innerText = `Đang quét xe... Xe gần nhất chưa vào phạm vi ${activeAlert.maxDistance >= 1000 ? (activeAlert.maxDistance/1000) + 'km' : activeAlert.maxDistance + 'm'}`;
+        if (rel && !rel.passed && rel.meters <= a.maxDistance && (!best || rel.meters < best.meters)) {
+            best = { plate: b.plate, meters: rel.meters, speed: b.speed };
         }
+    }
+    if (best) triggerStationAlert(best.plate, best.meters, etaMinutes(best.meters, best.speed));
+}
+
+// Kiểm tra định kỳ với API trạm (chính xác hơn, cả khi đang xem tuyến khác)
+async function pollAlertStation() {
+    const a = state.alert;
+    if (!a) return;
+    try {
+        const json = await getJson(`/api/realtime/station/${a.station.stationId}?fleet=${encodeURIComponent(a.routeCode)}`);
+        if (state.alert !== a || !json.success) return;
+        const wantGo = a.station.dir === 'go';
+        const hit = (json.buses || []).find(b =>
+            String(b.fleet).trim().toLowerCase() === String(a.routeCode).toLowerCase() &&
+            b.isGo === wantGo && typeof b.partRemained === 'number' && b.partRemained <= a.maxDistance);
+        if (hit) triggerStationAlert(hit.plate, hit.partRemained, Math.max(1, Math.round((hit.timeRemained || 60) / 60)));
     } catch (e) {
         console.warn('Alert check failed:', e);
     }
 }
 
-// ==========================================
-// 3.1 DEPARTURE ALERT ENGINE (CANH XE RỜI BẾN) & MÔ PHỎNG CUỘC GỌI
-// ==========================================
-let pendingDeparture = null;
-let activeDepartureAlert = null;
-let inCallTimer = null;
-let callDurationSec = 0;
-let currentCallContext = null;
-
-function startCallTimer() {
-    stopCallTimer();
-    callDurationSec = 0;
-    if (callTimer) {
-        callTimer.innerText = '00:00';
-        callTimer.style.display = 'block';
-    }
-    inCallTimer = setInterval(() => {
-        callDurationSec++;
-        const mins = String(Math.floor(callDurationSec / 60)).padStart(2, '0');
-        const secs = String(callDurationSec % 60).padStart(2, '0');
-        if (callTimer) callTimer.innerText = `${mins}:${secs}`;
-    }, 1000);
-}
-
-function stopCallTimer() {
-    if (inCallTimer) {
-        clearInterval(inCallTimer);
-        inCallTimer = null;
-    }
-    callDurationSec = 0;
-    if (callTimer) callTimer.style.display = 'none';
-}
-
-function showIncomingCall(plate, fleet, subTitle = '', voiceMessage = '') {
-    if (!incomingCallOverlay) return;
-    currentCallContext = {
+function triggerStationAlert(plate, meters, eta) {
+    const a = state.alert;
+    setAlertStatus(`⚠️ Xe ${plate} cách ${fmtDist(meters)} (~${eta} phút)`);
+    if (a.notifiedPlate === plate) return;
+    a.notifiedPlate = plate;
+    fireAlert(a, {
         plate,
-        fleet,
-        subTitle: subTitle || `Tuyến ${fleet} • Xe đã xuất bến!`,
-        voiceMessage: voiceMessage || `Thông báo: Xe buýt biển số ${plate} tuyến ${fleet} đã bắt đầu xuất bến và đang di chuyển. Bạn hãy chuẩn bị ra đón xe nhé!`
-    };
-
-    incomingCallOverlay.style.display = 'flex';
-    if (callCallerName) callCallerName.innerText = `Xe ${plate}`;
-    if (callCallerSub) callCallerSub.innerText = currentCallContext.subTitle;
-    if (callStatusLabel) callStatusLabel.innerText = 'Đang đổ chuông cuộc gọi...';
-    if (callRingingActions) callRingingActions.style.display = 'flex';
-    if (callActiveActions) callActiveActions.style.display = 'none';
-    stopCallTimer();
-}
-
-function answerCall(plate, fleet) {
-    stopPhoneRingtone();
-    if (callStatusLabel) callStatusLabel.innerText = 'Đang nghe cuộc gọi trực tiếp';
-    if (callRingingActions) callRingingActions.style.display = 'none';
-    if (callActiveActions) callActiveActions.style.display = 'flex';
-    startCallTimer();
-
-    const voiceMsg = currentCallContext ? currentCallContext.voiceMessage : `Thông báo: Xe buýt biển số ${plate} tuyến ${fleet} đang đến gần. Bạn hãy chuẩn bị đón xe nhé!`;
-    speakVietnamese(voiceMsg);
-}
-
-function hangupCall() {
-    stopPhoneRingtone();
-    stopCallTimer();
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    if (incomingCallOverlay) incomingCallOverlay.style.display = 'none';
-}
-
-window.openDepartureModal = function(plate, fleet, stationName, partRemained, lat, lng) {
-    pendingDeparture = {
-        plate,
-        fleet: fleet || (currentRoute ? currentRoute.code : ''),
-        stationName,
-        partRemained,
-        lat,
-        lng
-    };
-
-    if (depModalPlate) depModalPlate.innerText = plate;
-    if (depModalStatus) depModalStatus.innerText = `Tuyến ${pendingDeparture.fleet} • Vị trí: ${stationName || 'Bến xe'}`;
-    if (departureModal) departureModal.style.display = 'flex';
-
-    requestNotificationPermission();
-    if (!ringtoneAudioCtx) {
-        ringtoneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-};
-
-if (modalDepartureCloseBtn) modalDepartureCloseBtn.addEventListener('click', () => departureModal.style.display = 'none');
-if (btnCancelDepartureModal) btnCancelDepartureModal.addEventListener('click', () => departureModal.style.display = 'none');
-
-if (btnTestDepCall) {
-    btnTestDepCall.addEventListener('click', () => {
-        startPhoneRingtone();
-        triggerVibration();
-        const testPlate = pendingDeparture ? pendingDeparture.plate : '29E-95736';
-        const testFleet = pendingDeparture ? pendingDeparture.fleet : '83';
-        showIncomingCall(testPlate, testFleet);
+        title: `Xe tuyến ${a.routeCode} sắp đến ${a.station.name}`,
+        body: `Xe ${plate} còn cách ${fmtDist(meters)} (~${eta} phút).`,
+        sub: `Cách trạm ${fmtDist(meters)} · ~${eta} phút`,
+        voice: `Xe buýt biển số ${plate} tuyến ${a.routeCode} còn cách điểm dừng ${a.station.name} khoảng ${Math.round(meters)} mét, khoảng ${eta} phút nữa sẽ tới. Quý khách vui lòng chuẩn bị đón xe.`
     });
 }
 
-if (btnActivateDeparture) {
-    btnActivateDeparture.addEventListener('click', () => {
-        if (!pendingDeparture) return;
-
-        activeDepartureAlert = {
-            plate: pendingDeparture.plate,
-            fleet: pendingDeparture.fleet,
-            initialPartRemained: pendingDeparture.partRemained || 0,
-            initialLat: pendingDeparture.lat || 0,
-            initialLng: pendingDeparture.lng || 0,
-            startTime: Date.now(),
-            call: chkDepCall ? chkDepCall.checked : true,
-            sound: chkDepSound ? chkDepSound.checked : true,
-            vibrate: chkDepVibrate ? chkDepVibrate.checked : true,
-            notify: chkDepNotify ? chkDepNotify.checked : true
-        };
-
-        departureModal.style.display = 'none';
-
-        if (departureBanner) {
-            departureBanner.style.display = 'flex';
-            if (departureBannerTitle) departureBannerTitle.innerText = `Đang canh xe ${activeDepartureAlert.plate} (Tuyến ${activeDepartureAlert.fleet}) xuất bến!`;
-            if (departureBannerStatus) departureBannerStatus.innerText = `Hệ thống sẽ đổ chuông & gọi điện ngay khi xe bắt đầu di chuyển.`;
-        }
-
-        alert(`🚀 ĐÃ KÍCH HOẠT CANH XE!\n\nĐang theo dõi xe ${activeDepartureAlert.plate} Tuyến ${activeDepartureAlert.fleet}.\nNgay khi xe chuyển bánh xuất bến, hệ thống sẽ lập tức đổ chuông, rung máy và gọi điện báo cho bạn!`);
+// Xe được coi là xuất bến khi báo vận tốc >= 5 km/h hoặc đã dịch chuyển >= 60 m
+function checkDeparture(b) {
+    const d = state.departure;
+    if (!d || b.plate !== d.plate) return;
+    const moved = Geo.distance(b.lat, b.lng, d.lat, d.lng);
+    if (!(b.speed >= 5 || moved >= 60)) return;
+    state.departure = null;
+    $('status-departure-text').textContent = `⚠️ Xe ${d.plate} đã xuất bến!`;
+    $('status-departure').classList.add('hot');
+    fireAlert(d, {
+        plate: d.plate,
+        title: `Xe ${d.plate} đã xuất bến`,
+        body: `Xe tuyến ${d.fleet} vừa bắt đầu chạy.`,
+        sub: `Tuyến ${d.fleet} · Đã xuất bến`,
+        voice: `Xe buýt biển số ${d.plate} tuyến ${d.fleet} đã xuất bến và đang di chuyển. Bạn hãy chuẩn bị ra đón xe nhé.`
     });
 }
 
-window.stopDepartureAlert = function() {
-    activeDepartureAlert = null;
-    if (departureBanner) departureBanner.style.display = 'none';
-    stopPhoneRingtone();
-};
+setInterval(pollAlertStation, ALERT_POLL_MS);
 
-if (btnStopDeparture) {
-    btnStopDeparture.addEventListener('click', stopDepartureAlert);
+// ==========================================
+// 9. TÌM KIẾM
+// ==========================================
+let searchTimer = null;
+let searchSeq = 0;
+
+function onSearchInput() {
+    const q = $('search-input').value.trim();
+    $('btn-clear-search').hidden = !q;
+    clearTimeout(searchTimer);
+    if (!q) return hideDropdown();
+    searchTimer = setTimeout(() => runSearch(q), 250);
 }
 
-if (btnAcceptCall) {
-    btnAcceptCall.addEventListener('click', () => {
-        const plate = activeDepartureAlert ? activeDepartureAlert.plate : (pendingDeparture ? pendingDeparture.plate : '29E-95736');
-        const fleet = activeDepartureAlert ? activeDepartureAlert.fleet : (pendingDeparture ? pendingDeparture.fleet : '83');
-        answerCall(plate, fleet);
-    });
-}
+async function runSearch(q) {
+    const seq = ++searchSeq;
+    let json;
+    try { json = await getJson(`/api/search?q=${encodeURIComponent(q)}`); } catch { return; }
+    if (seq !== searchSeq || !json.success) return; // bỏ kết quả cũ
 
-if (btnDeclineCall) btnDeclineCall.addEventListener('click', () => hangupCall());
-if (btnHangupCall) btnHangupCall.addEventListener('click', () => hangupCall());
-
-function checkDepartureCondition(bus) {
-    if (!activeDepartureAlert) return;
-    const busPlate = String(bus.plate || '').trim();
-    if (busPlate !== String(activeDepartureAlert.plate).trim()) return;
-
-    const distDelta = Math.abs((bus.partRemained || 0) - activeDepartureAlert.initialPartRemained);
-    const geoDelta = (bus.lat && bus.lng && activeDepartureAlert.initialLat && activeDepartureAlert.initialLng)
-        ? getDistance(bus.lat, bus.lng, activeDepartureAlert.initialLat, activeDepartureAlert.initialLng)
-        : 0;
-    const speed = bus.speed || 0;
-
-    // Phát hiện xe bắt đầu chuyển bánh (tốc độ > 5 km/h hoặc di chuyển quá 50m)
-    if (speed >= 5 || distDelta >= 50 || geoDelta >= 50) {
-        triggerDepartureAlert(bus);
-    }
-}
-
-function triggerDepartureAlert(bus) {
-    if (!activeDepartureAlert) return;
-
-    const alertCopy = { ...activeDepartureAlert };
-    activeDepartureAlert = null; // Tránh kích hoạt lặp
-
-    if (departureBannerStatus) {
-        departureBannerStatus.innerHTML = `⚠️ <b style="color: #fef08a;">XE ĐÃ RỜI BẾN!</b> Xe <b>${alertCopy.plate}</b> đã bắt đầu di chuyển!`;
-    }
-
-    if (alertCopy.sound) startPhoneRingtone();
-    if (alertCopy.vibrate) triggerVibration();
-
-    if (alertCopy.notify && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification(`Xe buýt ${alertCopy.plate} đã xuất bến!`, {
-            body: `Xe tuyến ${alertCopy.fleet} (${alertCopy.plate}) vừa chuyển bánh rời bến và đang bắt đầu hành trình. Hãy chuẩn bị ra đón xe!`,
-            icon: 'icon.png'
-        });
-    }
-
-    if (alertCopy.call) {
-        showIncomingCall(alertCopy.plate, alertCopy.fleet);
+    const routes = json.routes || [];
+    const stations = json.stations || [];
+    state.searchResults = stations;
+    const dd = $('search-dropdown');
+    if (!routes.length && !stations.length) {
+        dd.innerHTML = `<div class="dd-empty">Không tìm thấy "${esc(q)}"</div>`;
     } else {
-        alert(`🔔 XE BUÝT ĐÃ XUẤT BẾN!\n\nXe ${alertCopy.plate} Tuyến ${alertCopy.fleet} đã bắt đầu rời bến và đang di chuyển!`);
+        dd.innerHTML =
+            (routes.length ? '<div class="dd-header">Tuyến xe</div>' + routes.map(r => `
+                <div class="dd-item" data-action="search-route" data-code="${esc(r.code)}">
+                    <div class="dd-badge">${esc(r.code)}</div>
+                    <div class="dd-info">
+                        <div class="dd-name">${esc(r.name)}</div>
+                        <div class="dd-desc">${esc(r.frequence || '')} · ${formatCost(r.cost)}</div>
+                    </div>
+                </div>`).join('') : '') +
+            (stations.length ? '<div class="dd-header">Điểm dừng</div>' + stations.map((s, i) => {
+                const dir = s.isGo === true ? 'go' : s.isGo === false ? 'ret' : '';
+                return `
+                <div class="dd-item" data-action="search-station" data-idx="${i}">
+                    <div class="dd-info">
+                        <div class="dd-name">${esc(s.name)}</div>
+                        <div class="dd-desc">${dir ? `<span class="dir-tag ${dir}">${dirLabel(dir)}</span> · ` : ''}Tuyến: ${esc(s.fleetOver || '—')}</div>
+                    </div>
+                </div>`;
+            }).join('') : '');
     }
+    dd.hidden = false;
+}
+
+function hideDropdown() { $('search-dropdown').hidden = true; }
+
+function clearSearch() {
+    $('search-input').value = '';
+    $('btn-clear-search').hidden = true;
+    hideDropdown();
 }
 
 // ==========================================
-// 4. LOCATION ENGINE (GPS + MANUAL PICKING)
+// 10. DANH SÁCH (SHEET)
 // ==========================================
-
-document.getElementById('btn-locate').addEventListener('click', () => {
-    if (!navigator.geolocation) {
-        alert('Thiết bị của bạn không hỗ trợ định vị.');
-        return;
-    }
-
-    showLoading(true, 'Đang xác định vị trí...');
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            showLoading(false);
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            const accuracy = pos.coords.accuracy || 0;
-
-            setUserPosition(lat, lng, accuracy);
-
-            if (accuracy > 800) {
-                locationHintToast.style.display = 'flex';
-            }
-        },
-        (err) => {
-            showLoading(false);
-            locationHintToast.style.display = 'flex';
-            alert('Không lấy được GPS chính xác (' + err.message + '). Bạn có thể click chuột trực tiếp lên bản đồ để chọn vị trí của bạn.');
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-    );
-});
-
-document.getElementById('btn-pick-location').addEventListener('click', () => {
-    locationHintToast.style.display = 'flex';
-    locationHintToast.querySelector('span').innerHTML = '👉 <b>Hãy click vào vị trí bất kỳ trên bản đồ</b> để đặt vị trí của bạn.';
-});
-
-btnCloseToast.addEventListener('click', () => {
-    locationHintToast.style.display = 'none';
-});
-
-if (btnCloseStationFocus) {
-    btnCloseStationFocus.addEventListener('click', () => {
-        clearStationFocus();
-    });
+function openSheet(tab) {
+    if (tab) switchTab(tab);
+    $('sheet').classList.add('open');
+    $('sheet').setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sheet-open');
+    $('sheet-backdrop').hidden = false;
+    renderBusList();
 }
 
-function handleManualLocationPick(lat, lng) {
-    setUserPosition(lat, lng, 20);
-    locationHintToast.style.display = 'none';
+function closeSheet() {
+    $('sheet').classList.remove('open');
+    $('sheet').setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('sheet-open');
+    $('sheet-backdrop').hidden = true;
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + tab));
+    if (tab === 'buses') renderBusList();
+}
+
+function scrollToStopRow(stationId) {
+    const el = stationId && $('stop-row-' + stationId);
+    if (el) setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 260);
+}
+
+// ==========================================
+// 11. VỊ TRÍ NGƯỜI DÙNG
+// ==========================================
+function startPicking(msg) {
+    state.picking = true;
+    toast(msg || 'Chạm vào bản đồ để chọn vị trí của bạn', 5000);
+}
+
+function locate() {
+    if (!navigator.geolocation) return startPicking('Thiết bị không hỗ trợ định vị. Chạm vào bản đồ để chọn vị trí.');
+    showLoading(true);
+    navigator.geolocation.getCurrentPosition(pos => {
+        showLoading(false);
+        const { latitude, longitude, accuracy } = pos.coords;
+        setUserPosition(latitude, longitude, accuracy);
+        if (accuracy > 800) startPicking('Vị trí chưa chính xác. Chạm vào bản đồ để chọn lại.');
+    }, () => {
+        showLoading(false);
+        startPicking('Không lấy được GPS. Chạm vào bản đồ để chọn vị trí của bạn.');
+    }, { enableHighAccuracy: true, timeout: 8000 });
 }
 
 function setUserPosition(lat, lng, accuracy = 20) {
-    if (userLocationMarker) map.removeLayer(userLocationMarker);
-    if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
+    const map = state.map;
+    if (state.userMarker) map.removeLayer(state.userMarker);
+    if (state.userCircle) map.removeLayer(state.userCircle);
+    state.userCircle = L.circle([lat, lng], { radius: Math.min(accuracy, 2000), color: '#2563eb', weight: 1, fillOpacity: 0.1, interactive: false }).addTo(map);
+    state.userMarker = L.circleMarker([lat, lng], { radius: 8, fillColor: '#2563eb', color: '#fff', weight: 3, fillOpacity: 1 }).addTo(map);
+    map.setView([lat, lng], 16);
 
-    userLocationMarker = L.circleMarker([lat, lng], {
-        radius: 9,
-        fillColor: '#2563eb',
-        color: '#ffffff',
-        weight: 3,
-        opacity: 1,
-        fillOpacity: 0.95
-    }).addTo(map);
-
-    userAccuracyCircle = L.circle([lat, lng], {
-        radius: Math.min(accuracy, 2000),
-        color: '#2563eb',
-        fillColor: '#60a5fa',
-        fillOpacity: 0.15,
-        weight: 1
-    }).addTo(map);
-
-    userLocationMarker.bindPopup(`
-        <div style="font-family: inherit;">
-            <div style="font-weight: 800; color: #2563eb;">📍 Vị trí của bạn</div>
-            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Sai số ước tính: ±${Math.round(accuracy)}m</div>
-            <div style="font-size: 12px; margin-top: 6px;">Click vào trạm buýt gần nhất để xem xe sắp tới.</div>
-        </div>
-    `).openPopup();
-
-    map.setView([lat, lng], 15, { animate: true });
-}
-
-// Refresh button
-document.getElementById('btn-refresh-realtime').addEventListener('click', () => {
-    if (currentRoute) {
-        fetchRealtimeBuses();
-    } else if (currentStation) {
-        fetchRealtimeStationBuses();
+    // Gợi ý trạm gần nhất của chiều đang xem
+    if (!state.route) return;
+    let best = null;
+    for (const st of state.route[state.dir].stations) {
+        const d = Geo.distance(lat, lng, st.lat, st.lng);
+        if (!best || d < best.d) best = { st, d };
     }
-});
-
-// Đổi giao diện bản đồ (Google Maps đường sá chuẩn / Vệ tinh / OpenStreetMap)
-const btnToggleMapLayer = document.getElementById('btn-toggle-map-layer');
-if (btnToggleMapLayer) {
-    btnToggleMapLayer.addEventListener('click', () => {
-        if (currentTileType === 'google_roadmap') {
-            setMapTileLayer('google_hybrid');
-            if (locationHintToast) {
-                locationHintToast.querySelector('span').innerHTML = '🗺️ <b>Bản đồ: Google Maps Vệ tinh</b>';
-                locationHintToast.style.display = 'flex';
-                setTimeout(() => { locationHintToast.style.display = 'none'; }, 2000);
-            }
-        } else if (currentTileType === 'google_hybrid') {
-            setMapTileLayer('osm');
-            if (locationHintToast) {
-                locationHintToast.querySelector('span').innerHTML = '🗺️ <b>Bản đồ: OpenStreetMap</b>';
-                locationHintToast.style.display = 'flex';
-                setTimeout(() => { locationHintToast.style.display = 'none'; }, 2000);
-            }
-        } else {
-            setMapTileLayer('google_roadmap');
-            if (locationHintToast) {
-                locationHintToast.querySelector('span').innerHTML = '🗺️ <b>Bản đồ: Google Maps (Chuẩn sắc nét & siêu nhẹ)</b>';
-                locationHintToast.style.display = 'flex';
-                setTimeout(() => { locationHintToast.style.display = 'none'; }, 2000);
-            }
-        }
-    });
-}
-
-// Nút thu gọn / mở rộng cửa sổ xe gần nhất
-const btnToggleFocusCard = document.getElementById('btn-toggle-focus-card');
-if (btnToggleFocusCard) {
-    btnToggleFocusCard.addEventListener('click', (e) => {
-        e.stopPropagation();
-        isFocusCardCollapsed = !isFocusCardCollapsed;
-        applyFocusCardCollapsedState();
-    });
-}
-
-// Cho phép click vào thanh tiêu đề xe gần nhất để thu gọn/mở rộng nhanh
-const stationFocusTitleWrap = document.getElementById('station-focus-title-wrap');
-if (stationFocusTitleWrap) {
-    stationFocusTitleWrap.addEventListener('click', () => {
-        isFocusCardCollapsed = !isFocusCardCollapsed;
-        applyFocusCardCollapsedState();
-    });
-}
-
-// Nút thu gọn / mở rộng dải cảnh báo
-const btnToggleAlertBanner = document.getElementById('btn-toggle-alert-banner');
-if (btnToggleAlertBanner) {
-    btnToggleAlertBanner.addEventListener('click', () => {
-        isAlertBannerCollapsed = !isAlertBannerCollapsed;
-        alertBanner.classList.toggle('is-collapsed', isAlertBannerCollapsed);
-        btnToggleAlertBanner.innerText = isAlertBannerCollapsed ? '▼' : '▲';
-    });
-}
-
-// Nút thu gọn / mở rộng dải canh xe xuất bến
-const btnToggleDepBanner = document.getElementById('btn-toggle-departure-banner');
-if (btnToggleDepBanner) {
-    btnToggleDepBanner.addEventListener('click', () => {
-        isDepartureBannerCollapsed = !isDepartureBannerCollapsed;
-        if (departureBanner) departureBanner.classList.toggle('is-collapsed', isDepartureBannerCollapsed);
-        btnToggleDepBanner.innerText = isDepartureBannerCollapsed ? '▼' : '▲';
-    });
-}
-
-function switchTab(tabId) {
-    sheetTabs.forEach(t => t.classList.remove('active'));
-    tabBuses.classList.remove('active');
-    tabStations.classList.remove('active');
-    tabInfo.classList.remove('active');
-
-    const tabBtn = document.querySelector(`.sheet-tab[data-tab="${tabId}"]`);
-    if (tabBtn) tabBtn.classList.add('active');
-    document.getElementById(tabId).classList.add('active');
-}
-
-sheetTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-        const target = tab.getAttribute('data-tab');
-        switchTab(target);
-        openSidebar(target);
-    });
-});
-
-// Nút thu gọn / đóng Bottom Sheet & Sidebar
-const btnCollapseSheet = document.getElementById('btn-collapse-sheet');
-if (btnCollapseSheet) {
-    btnCollapseSheet.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeSidebar();
-    });
-}
-
-const btnCloseSidebar = document.getElementById('btn-close-sidebar');
-if (btnCloseSidebar) {
-    btnCloseSidebar.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeSidebar();
-    });
-}
-
-const sidebarBackdrop = document.getElementById('sidebar-backdrop');
-if (sidebarBackdrop) {
-    sidebarBackdrop.addEventListener('click', () => {
-        closeSidebar();
-    });
-}
-
-const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
-if (btnToggleSidebar) {
-    btnToggleSidebar.addEventListener('click', () => {
-        toggleSidebar();
-    });
-}
-
-const btnFloatingSidebar = document.getElementById('btn-floating-sidebar');
-if (btnFloatingSidebar) {
-    btnFloatingSidebar.addEventListener('click', () => {
-        toggleSidebar();
-    });
-}
-
-const btnToggleSheet = document.getElementById('btn-toggle-sheet');
-if (btnToggleSheet) {
-    btnToggleSheet.addEventListener('click', () => {
-        toggleSidebar();
-    });
-}
-
-if (sheetHandle) {
-    sheetHandle.addEventListener('click', () => {
-        toggleSidebar();
-    });
-}
-
-function showLoading(show, text = 'Đang tải...') {
-    loadingSpinner.style.display = show ? 'flex' : 'none';
-    document.getElementById('loading-text').innerText = text;
+    if (best && best.d < 1500) toast(`Trạm gần nhất: ${best.st.name} (${fmtDist(best.d)})`, 4000);
 }
 
 // ==========================================
-// 4. AUTO-UPDATE APP ENGINE (Tự động cập nhật & Bảo lưu 100% dữ liệu)
+// 12. CẬP NHẬT ỨNG DỤNG
 // ==========================================
-const APP_CURRENT_VERSION = '1.2.6';
-const DEFAULT_UPDATE_URL = 'https://raw.githubusercontent.com/tuanleanh89/timbus_promax/main/version.json';
-
-const btnCheckUpdate = document.getElementById('btn-check-update');
-const updateIcon = document.getElementById('update-icon');
-const updateText = document.getElementById('update-text');
-const updateModal = document.getElementById('update-modal');
-const updateModalTitle = document.getElementById('update-modal-title');
-const updateModalBody = document.getElementById('update-modal-body');
-const updateModalFooter = document.getElementById('update-modal-footer');
-const btnCloseUpdateModal = document.getElementById('btn-close-update-modal');
-const btnCancelUpdate = document.getElementById('btn-cancel-update');
-const btnConfirmUpdate = document.getElementById('btn-confirm-update');
-const btnManualCheckUpdate = document.getElementById('btn-manual-check-update');
-const infoCurrentVer = document.getElementById('info-current-ver');
-
-let latestUpdateData = null;
-
-function getUpdateManifestUrl() {
-    return localStorage.getItem('custom_bus_update_url') || DEFAULT_UPDATE_URL;
-}
-
-function isNewerVersion(remoteVer, currentVer) {
-    if (!remoteVer || !currentVer) return false;
-    const v1 = String(remoteVer).trim().replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
-    const v2 = String(currentVer).trim().replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
-    const len = Math.max(v1.length, v2.length);
-    for (let i = 0; i < len; i++) {
-        const a = v1[i] || 0;
-        const b = v2[i] || 0;
-        if (a > b) return true;
-        if (a < b) return false;
+function isNewer(remote, current) {
+    const a = String(remote || '').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+    const b = String(current || '').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+        if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
     }
     return false;
 }
 
-async function checkAppUpdate(isManual = false) {
-    if (updateIcon) updateIcon.style.animation = 'spin 0.8s linear infinite';
-
+async function loadLocalVersion() {
     try {
-        let url = getUpdateManifestUrl();
-        let updateData = null;
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}_nocache=${Date.now()}`, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (res.ok) updateData = await res.json();
-        } catch (_) {
-            // Fallback to local server endpoint if remote fails
-            if (url !== '/api/version') {
-                const resLocal = await fetch(`/api/version?_nocache=${Date.now()}`);
-                if (resLocal.ok) updateData = await resLocal.json();
-            }
-        }
-
-        if (!updateData) throw new Error('Không thể nạp dữ liệu phiên bản');
-        latestUpdateData = updateData;
-
-        const remoteVer = updateData.version || '';
-        const hasUpdate = isNewerVersion(remoteVer, APP_CURRENT_VERSION);
-
-        if (hasUpdate) {
-            if (btnCheckUpdate) btnCheckUpdate.classList.add('has-update');
-            if (updateIcon) updateIcon.innerText = '🔴';
-            if (updateText) updateText.innerText = `Có v${remoteVer}`;
-
-            showUpdateModal(updateData, true);
-        } else {
-            if (btnCheckUpdate) btnCheckUpdate.classList.remove('has-update');
-            if (updateIcon) updateIcon.innerText = '🔄';
-            if (updateText) updateText.innerText = `v${APP_CURRENT_VERSION}`;
-
-            if (isManual) {
-                showUpdateModal(updateData, false);
-            }
-        }
-    } catch (err) {
-        console.warn('Update check failed:', err);
-        if (isManual) {
-            alert(`⚠️ Không thể kết nối máy chủ cập nhật: ${err.message || 'Lỗi mạng'}\nVui lòng kiểm tra lại kết nối.`);
-        }
-    } finally {
-        if (updateIcon) updateIcon.style.animation = '';
-    }
+        const v = await getJson('/api/version');
+        state.version = v.version || null;
+    } catch { /* bỏ qua */ }
+    $('app-version').textContent = state.version ? 'v' + state.version : '';
 }
 
-function showUpdateModal(data, hasUpdate) {
-    if (!updateModal) return;
-    const remoteVer = (data && data.version) || APP_CURRENT_VERSION;
-    const releaseDate = (data && data.release_date) || 'Mới nhất';
-    const changelog = (data && Array.isArray(data.changelog)) ? data.changelog : [];
-
-    if (hasUpdate) {
-        updateModalTitle.innerHTML = `🚀 Đã có phiên bản mới: <b>v${remoteVer}</b>`;
-        updateModalBody.innerHTML = `
-            <div style="font-size: 13.5px; color: #334155;">
-                <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
-                    <span>Phiên bản hiện tại: <b>v${APP_CURRENT_VERSION}</b></span>
-                    <span style="color: #2563eb; font-weight: 800;">Mới: v${remoteVer}</span>
-                </div>
-                <div style="margin-top: 6px; font-size: 12px; color: #64748b;">Ngày phát hành: ${releaseDate}</div>
-
-                <div style="margin-top: 12px; font-weight: 700; color: #0f172a;">Những điểm mới trong bản cập nhật:</div>
-                <ul style="margin: 6px 0 12px 18px; padding: 0; font-size: 12.5px; color: #334155; line-height: 1.5;">
-                    ${changelog.map(item => `<li style="margin-bottom: 4px;">${item}</li>`).join('')}
-                </ul>
-
-                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 12px; color: #166534;">
-                    🛡️ <b>Đảm bảo an toàn:</b> Toàn bộ điểm dừng đã lưu, cấu hình tuyến mặc định và các thiết lập của bạn được bảo lưu 100%.
-                </div>
-            </div>
-        `;
-        updateModalFooter.style.display = 'flex';
-        btnConfirmUpdate.innerText = '⚡ Cập nhật ngay';
-        btnConfirmUpdate.style.display = 'block';
-        btnCancelUpdate.innerText = 'Để sau';
-    } else {
-        updateModalTitle.innerHTML = `✅ Bạn đang ở phiên bản mới nhất`;
-        updateModalBody.innerHTML = `
-            <div style="font-size: 13.5px; color: #334155; text-align: center; padding: 10px 0;">
-                <div style="font-size: 40px; margin-bottom: 6px;">🎉</div>
-                <div style="font-size: 16px; font-weight: 800; color: #0f172a;">Tìm Bus Promax v${APP_CURRENT_VERSION}</div>
-                <div style="font-size: 12.5px; color: #64748b; margin-top: 4px;">Ứng dụng của bạn đang chạy phiên bản mới nhất và tối ưu nhất.</div>
-                
-                <div style="margin-top: 14px; text-align: left; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-size: 12px;">
-                    <b>Tính năng hiện có trong v${APP_CURRENT_VERSION}:</b>
-                    <ul style="margin: 6px 0 0 18px; padding: 0; line-height: 1.45;">
-                        ${changelog.map(item => `<li style="margin-bottom: 3px;">${item}</li>`).join('')}
-                    </ul>
-                </div>
-            </div>
-        `;
-        updateModalFooter.style.display = 'flex';
-        btnConfirmUpdate.style.display = 'none';
-        btnCancelUpdate.innerText = 'Đóng';
-    }
-
-    updateModal.style.display = 'flex';
-}
-
-async function performAppUpdate() {
-    updateModalTitle.innerHTML = `⏳ Đang tiến hành cập nhật...`;
-    updateModalBody.innerHTML = `
-        <div style="text-align: center; padding: 20px 10px;">
-            <div class="spinner" style="margin: 0 auto 14px auto;"></div>
-            <div style="font-weight: 700; color: #0f172a;">Đang xóa bộ nhớ đệm & nạp mã nguồn mới...</div>
-            <div style="font-size: 12px; color: #64748b; margin-top: 6px;">Dữ liệu điểm dừng và tuyến yêu thích được giữ nguyên 100%.</div>
-        </div>
-    `;
-    updateModalFooter.style.display = 'none';
-
+async function checkUpdate(manual) {
+    let remote = null;
     try {
-        if ('caches' in window) {
-            const keys = await caches.keys();
-            await Promise.all(keys.map(k => caches.delete(k)));
-        }
-        if ('serviceWorker' in navigator) {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            for (const r of regs) {
-                await r.update();
-            }
-        }
-    } catch (e) {
-        console.warn('Cache clear error:', e);
+        const url = localStorage.getItem(KEY.updateUrl) || UPDATE_URL;
+        remote = await getJson(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`, { signal: AbortSignal.timeout?.(5000) });
+    } catch { /* mạng lỗi */ }
+
+    if (!remote || !remote.version || !state.version) {
+        if (manual) toast('Không kết nối được máy chủ cập nhật');
+        return;
     }
+    const hasUpdate = isNewer(remote.version, state.version);
+    if (!hasUpdate) {
+        if (manual) toast(`Bạn đang dùng bản mới nhất (v${state.version})`);
+        return;
+    }
+    $('app-version').textContent = `v${state.version} · có bản v${remote.version}`;
+    if (!manual && localStorage.getItem(KEY.dismissedUpdate) === remote.version) return;
 
-    setTimeout(() => {
-        window.location.href = window.location.pathname + '?_v=' + Date.now();
-    }, 1200);
+    $('update-title').textContent = `Có phiên bản mới v${remote.version}`;
+    const log = Array.isArray(remote.changelog) ? remote.changelog : [];
+    $('update-body').innerHTML = `
+        <p class="muted">Đang dùng v${esc(state.version)}${remote.release_date ? ' · phát hành ' + esc(remote.release_date) : ''}</p>
+        ${log.length ? `<ul>${log.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}
+        <p class="muted" style="margin-top:8px">Trạm đã lưu và tuyến mặc định được giữ nguyên.</p>`;
+    $('update-modal').dataset.version = remote.version;
+    $('update-modal').hidden = false;
 }
 
-if (btnCheckUpdate) {
-    btnCheckUpdate.addEventListener('click', () => checkAppUpdate(true));
-}
-if (btnManualCheckUpdate) {
-    btnManualCheckUpdate.addEventListener('click', () => checkAppUpdate(true));
-}
-if (btnCloseUpdateModal) {
-    btnCloseUpdateModal.addEventListener('click', () => { updateModal.style.display = 'none'; });
-}
-if (btnCancelUpdate) {
-    btnCancelUpdate.addEventListener('click', () => { updateModal.style.display = 'none'; });
-}
-if (btnConfirmUpdate) {
-    btnConfirmUpdate.addEventListener('click', performAppUpdate);
+async function performUpdate() {
+    $('update-modal').hidden = true;
+    showLoading(true);
+    try {
+        // Xoá cache giao diện, giữ cache ô bản đồ
+        if ('caches' in window) await Promise.all((await caches.keys()).filter(k => !k.startsWith('tiles')).map(k => caches.delete(k)));
+        if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.update();
+    } catch (e) { console.warn('Cache clear error:', e); }
+    location.href = location.pathname + '?_v=' + Date.now();
 }
 
 // ==========================================
-// 5. RESET TO HOME (VỀ TRANG BAN ĐẦU KHI BẤM LOGO / BIỂU TƯỢNG)
+// 13. SỰ KIỆN
 // ==========================================
-const brandHomeBtn = document.getElementById('brand-home-btn');
-if (brandHomeBtn) {
-    brandHomeBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        resetToHome();
-    });
+// Về màn hình chính: tuyến mặc định + mở luôn trạm đã lưu đầu tiên (nếu có)
+// để vừa mở app là thấy ngay "xe tiếp theo còn mấy phút".
+async function goHome() {
+    clearSearch();
+    closeSheet();
+    switchTab('buses');
+    await selectRoute(getDefaultRoute());
+    if (!state.route) return;
+    const fav = getFavs(state.route.code)[0];
+    if (!fav) return;
+    const dir = fav.direction || resolveStationDir(fav) || 'go';
+    const st = state.route[dir].stations.find(s => s.stationId === fav.stationId) || fav;
+    selectStation({ ...st, dir });
 }
 
-function resetToHome() {
-    clearStationFocus();
-    searchInput.value = '';
-    clearSearchBtn.style.display = 'none';
-    searchDropdown.style.display = 'none';
-
-    // Đưa top controls về trạng thái mở nếu đang thu gọn
-    document.body.classList.remove('top-controls-collapsed');
-    if (btnToggleTopControls) {
-        btnToggleTopControls.classList.remove('is-collapsed');
-        if (toggleTopIcon) toggleTopIcon.innerText = '▲';
-        if (toggleTopText) toggleTopText.innerText = 'Thu gọn';
+// Hành động trên các phần tử sinh động (dropdown, danh sách, popup, chip)
+const actions = {
+    'search-route': el => {
+        hideDropdown();
+        $('search-input').value = `Tuyến ${el.dataset.code}`;
+        selectRoute(el.dataset.code);
+    },
+    'search-station': el => {
+        const s = state.searchResults[+el.dataset.idx];
+        if (!s) return;
+        hideDropdown();
+        $('search-input').value = s.name;
+        selectStation({ ...s, dir: s.isGo === true ? 'go' : s.isGo === false ? 'ret' : null });
+    },
+    'select-stop': el => {
+        const st = state.route[state.dir].stations[+el.dataset.idx];
+        if (!isDesktop()) closeSheet();
+        selectStation({ ...st, dir: state.dir });
+    },
+    'fav-stop': el => toggleFav({ ...state.route[state.dir].stations[+el.dataset.idx], dir: state.dir }),
+    'chip': el => {
+        const f = currentDirFavs()[+el.dataset.idx];
+        if (f) selectStation({ ...f, dir: state.dir });
+    },
+    'chip-del': el => {
+        const f = currentDirFavs()[+el.dataset.idx];
+        if (f) toggleFav({ ...f, dir: state.dir });
+    },
+    'bus': el => focusBus(el.dataset.plate),
+    'departure': el => {
+        const b = state.buses.get(el.dataset.plate);
+        if (!b) return;
+        state.map.closePopup();
+        openAlertModal('departure', { plate: b.plate, fleet: b.fleet || state.route.code, lat: b.lat, lng: b.lng });
     }
+};
 
-    // Mặc định ban đầu ĐỂ ẨN sidebar
-    closeSidebar();
-
-    // Chuyển về tab xe đang chạy
-    switchTab('tab-buses');
-
-    // Nạp lại tuyến mặc định ban đầu
-    const defaultRoute = localStorage.getItem('bus_hanoi_default_route') || '83';
-    selectRoute(defaultRoute);
-}
-
-// Initial Boot
-window.addEventListener('DOMContentLoaded', async () => {
-    initMap();
-    // Tự động tải tuyến mặc định đã lưu của người dùng (mặc định Tuyến 83)
-    const defaultRoute = localStorage.getItem('bus_hanoi_default_route') || '83';
-    selectRoute(defaultRoute);
-
-    // Tự động kiểm tra bản cập nhật mới sau 3 giây
-    setTimeout(() => {
-        checkAppUpdate(false);
-    }, 3000);
+document.addEventListener('click', e => {
+    const el = e.target.closest('[data-action]');
+    if (el && actions[el.dataset.action]) {
+        e.stopPropagation();
+        actions[el.dataset.action](el);
+        return;
+    }
+    if (!e.target.closest('#search-dropdown, .search-card')) hideDropdown();
 });
+
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    hideDropdown();
+    closeAlertModal();
+    $('update-modal').hidden = true;
+    closeSheet();
+});
+
+const on = (id, fn) => $(id).addEventListener('click', fn);
+
+$('search-input').addEventListener('input', onSearchInput);
+$('search-input').addEventListener('focus', () => { if ($('search-input').value.trim() && $('search-dropdown').innerHTML) $('search-dropdown').hidden = false; });
+on('btn-clear-search', () => { clearSearch(); $('search-input').focus(); });
+on('btn-home', goHome);
+
+on('btn-dir-go', () => setDirection('go'));
+on('btn-dir-ret', () => setDirection('ret'));
+on('btn-route-info', () => {
+    openSheet('stations');
+    scrollToStopRow(state.station?.stationId || currentDirFavs()[0]?.stationId);
+});
+on('btn-set-default', () => {
+    if (!state.route) return;
+    localStorage.setItem(KEY.defaultRoute, state.route.code);
+    renderDefaultStar();
+    toast(`Đã đặt tuyến ${state.route.code} làm mặc định`);
+});
+
+on('btn-focus-close', clearStation);
+on('btn-focus-fav', () => toggleFav(state.station));
+on('btn-focus-bus', () => state.nearestPlate && focusBus(state.nearestPlate));
+on('btn-focus-alert', () => {
+    if (isAlertingStation(state.station)) stopAlert();
+    else openAlertModal('station', state.station);
+});
+
+on('btn-locate', locate);
+on('btn-open-sheet', () => ($('sheet').classList.contains('open') ? closeSheet() : openSheet()));
+on('btn-close-sheet', closeSheet);
+on('sheet-backdrop', closeSheet);
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+on('btn-cancel-alert', closeAlertModal);
+on('alert-modal', e => { if (e.target.id === 'alert-modal') closeAlertModal(); });
+on('btn-activate-alert', activateAlert);
+on('btn-test-alert', () => {
+    const plate = state.modal?.target?.plate || '29E-12345';
+    localStorage.setItem(KEY.ringTested, '1');
+    $('btn-test-alert').hidden = true;
+    startRingtone(10000);
+    vibrate();
+    showCall(plate, 'Thử chuông cảnh báo', `Đây là cuộc gọi thử. Xe buýt biển số ${plate} sắp tới, quý khách vui lòng chuẩn bị đón xe.`);
+});
+on('btn-stop-alert', stopAlert);
+on('btn-stop-departure', stopDeparture);
+
+on('btn-call-accept', answerCall);
+on('btn-call-decline', endCall);
+
+on('btn-check-update', () => checkUpdate(true));
+on('btn-cancel-update', () => {
+    localStorage.setItem(KEY.dismissedUpdate, $('update-modal').dataset.version || '');
+    $('update-modal').hidden = true;
+});
+on('btn-confirm-update', performUpdate);
+
+// ==========================================
+// 14. KHỞI ĐỘNG
+// ==========================================
+initMap();
+goHome();
+loadLocalVersion().then(() => setTimeout(() => checkUpdate(false), 3000));
+
+// Service worker: cache bản đồ/giao diện và cho phép thông báo trên Android.
+// Chỉ chạy trên "secure context" (https hoặc localhost).
+if ('serviceWorker' in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW register failed:', e));
+}

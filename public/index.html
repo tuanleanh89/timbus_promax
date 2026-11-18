@@ -3,430 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tìm Bus Promax - Bản đồ Realtime & Cảnh báo xe đến</title>
-    <meta name="theme-color" content="#0066cc">
+    <title>Tìm Bus Promax</title>
+    <meta name="theme-color" content="#2563eb">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
-
-    <!-- Leaflet Map CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app" class="app-container">
-        <!-- Top App Bar -->
-        <header class="top-bar">
-            <div class="brand">
-                <div class="brand-left" id="brand-home-btn" title="Bấm để về trang chủ ban đầu" style="cursor: pointer;">
-                    <div class="bus-icon-badge">
-                        <img src="icon.png" alt="Tìm Bus Promax">
-                    </div>
-                    <div class="brand-text">
-                        <h1>Tìm Bus Promax</h1>
-                        <span id="connection-status" class="status-live">● Live Tracking</span>
-                    </div>
-                </div>
-                <div class="brand-actions">
-                    <button id="btn-toggle-sidebar" class="btn-toggle-sidebar" title="Mở danh sách xe & điểm dừng">
-                        <span class="sidebar-toggle-icon">📋</span>
-                        <span class="sidebar-toggle-text">Xe & Trạm</span>
-                    </button>
-                    <button id="btn-check-update" class="btn-check-update" title="Kiểm tra bản cập nhật mới nhất">
-                        <span id="update-icon" class="update-icon">🔄</span>
-                        <span id="update-text" class="update-text">v1.2.6</span>
-                    </button>
-                    <button id="btn-toggle-top-controls" class="btn-toggle-top-controls" title="Ẩn/hiện ô tìm kiếm & thông tin tuyến để mở rộng bản đồ">
-                        <span id="toggle-top-icon">▲</span>
-                        <span id="toggle-top-text">Thu gọn</span>
-                    </button>
-                </div>
-            </div>
+    <div id="map"></div>
 
-            <!-- Search Input Box (Universal Search: Tuyến + Điểm dừng) -->
-            <div class="search-box">
-                <span class="search-icon">🔍</span>
-                <input type="text" id="route-search-input" placeholder="Tìm số tuyến hoặc điểm dừng" autocomplete="off">
-                <button id="clear-search-btn" class="clear-btn" style="display: none;">✕</button>
-            </div>
-
-            <!-- Quick Dropdown Suggestion -->
-            <div id="search-dropdown" class="search-dropdown" style="display: none;"></div>
-        </header>
-
-        <!-- Active Context Bar (Hiển thị khi đang xem 1 tuyến hoặc 1 điểm dừng) -->
-        <div id="active-route-bar" class="active-route-bar" style="display: none;">
-            <div class="route-badge-box" id="route-badge-box" title="Bấm để xem danh sách điểm dừng của tuyến">
-                <span id="route-code-badge" class="route-code-badge">--</span>
-                <div class="route-title-wrap">
-                    <div class="route-title-row">
-                        <h2 id="route-title">Đang tải...</h2>
-                        <span id="route-expand-hint" class="route-expand-hint">🚏 Xem điểm dừng ▼</span>
-                    </div>
-                    <p id="route-meta">-- phút/chuyến • --đ</p>
-                </div>
-            </div>
-
-            <div class="route-actions-wrap">
-                <button id="btn-set-default" class="btn-set-default" title="Đặt làm tuyến mặc định khi mở app">⭐ Mặc định</button>
-                <div id="direction-switch-box" class="direction-switch">
-                    <button id="btn-dir-go" class="dir-btn active">Chiều đi</button>
-                    <button id="btn-dir-ret" class="dir-btn">Chiều về</button>
-                </div>
-            </div>
-
-            <!-- Dòng riêng biệt: Danh sách các điểm dừng đã lưu của tuyến -->
-            <div id="saved-stations-bar" class="saved-stations-bar" style="display: none;">
-                <div class="saved-stations-header">
-                    <span class="saved-title-icon">⭐</span>
-                    <span class="saved-title-text" id="saved-title-text">Đã lưu:</span>
-                </div>
-                <div id="saved-stations-list" class="saved-stations-chips"></div>
-            </div>
-        </div>
-
-        <!-- Proximity Alert Active Banner -->
-        <div id="alert-banner" class="alert-banner" style="display: none;">
-            <div class="alert-icon-wrap">🔔</div>
-            <div class="alert-info-wrap">
-                <div class="alert-station-name" id="alert-banner-station">Chưa chọn trạm</div>
-                <div class="alert-status-text" id="alert-banner-status">Đang quét xe đến gần...</div>
-            </div>
-            <div class="alert-actions-group">
-                <button id="btn-toggle-alert-banner" class="alert-min-btn" title="Thu gọn/Mở rộng cảnh báo">▲</button>
-                <button id="btn-stop-alert" class="alert-stop-btn">Tắt báo</button>
-            </div>
-        </div>
-
-        <!-- Departure Alert Active Banner (Canh xe xuất bến) -->
-        <div id="departure-banner" class="alert-banner departure-active-banner" style="display: none;">
-            <div class="alert-icon-wrap">🚀</div>
-            <div class="alert-info-wrap">
-                <div class="alert-station-name" id="departure-banner-title">Đang canh xe xuất bến</div>
-                <div class="alert-status-text" id="departure-banner-status">Khi xe bắt đầu di chuyển sẽ đổ chuông & gọi...</div>
-            </div>
-            <div class="alert-actions-group">
-                <button id="btn-toggle-departure-banner" class="alert-min-btn" title="Thu gọn/Mở rộng canh xe">▲</button>
-                <button id="btn-stop-departure" class="alert-stop-btn">Hủy canh</button>
-            </div>
-        </div>
-
-        <!-- Station Focus Card (Tự động tính khoảng cách, ETA & Highlight xe gần nhất - Có thu gọn/mở rộng tối giản) -->
-        <div id="station-focus-card" class="station-focus-card" style="display: none;">
-            <div class="station-focus-header">
-                <div class="station-focus-title" id="station-focus-title-wrap">
-                    <span class="station-focus-icon">🚏</span>
-                    <div class="station-focus-texts">
-                        <div class="station-focus-name" id="station-focus-name">Điểm dừng đã chọn</div>
-                        <div class="station-focus-sub" id="station-focus-sub">
-                            <span class="dir-pill pill-go" id="station-focus-dir">Chiều đi</span>
-                            <span id="station-focus-route-tag" style="font-size: 11.5px; color: #475569; margin-left: 6px;">Tuyến 83</span>
-                            <span id="station-focus-mini-summary" class="station-focus-mini-summary" style="display: none;"></span>
-                        </div>
-                    </div>
-                </div>
-                <div class="station-focus-header-btns">
-                    <button id="btn-toggle-focus-card" class="station-focus-toggle-btn" title="Thu gọn hoặc mở rộng cửa sổ xe gần nhất">
-                        <span id="toggle-focus-text">▲ Thu gọn</span>
-                    </button>
-                    <button id="btn-close-station-focus" class="station-focus-close" title="Bỏ chọn trạm này">✕ Bỏ chọn</button>
-                </div>
-            </div>
-            <div id="station-focus-content" class="station-focus-content">
-                <!-- Sẽ được fill động bởi updateStationFocusUI() -->
-            </div>
-        </div>
-
-        <!-- Toast notification for desktop location hint -->
-        <div id="location-hint-toast" class="location-hint-toast" style="display: none;">
-            <span>💡 Trên máy tính, vị trí theo mạng internet có thể bị lệch. Bạn có thể <b>click chuột trực tiếp lên bản đồ</b> để chọn đúng vị trí của mình!</span>
-            <button id="btn-close-toast" class="toast-close">✕</button>
-        </div>
-
-        <!-- Map Container -->
-        <main class="map-wrapper">
-            <div id="map"></div>
-
-            <!-- Floating Sidebar Pill Button -->
-            <button id="btn-floating-sidebar" class="floating-sidebar-pill" title="Mở danh sách xe đang chạy & điểm dừng">
-                <span class="pill-icon">📋</span>
-                <span class="pill-label">Xe & Điểm dừng</span>
-                <span id="floating-bus-count" class="pill-badge">0 xe</span>
-            </button>
-
-            <!-- Map Floating Controls (GPS, Chọn vị trí, Làm mới - Gọn gàng không nút thừa) -->
-            <div class="map-controls">
-                <button id="btn-locate" class="ctrl-btn" title="Vị trí của tôi (GPS)">
-                    <span class="ctrl-icon">🎯</span>
+    <!-- Thanh trên: tìm kiếm + tuyến đang xem -->
+    <header class="top">
+        <div class="card search-card">
+            <div class="search-row">
+                <button id="btn-home" class="logo" title="Về tuyến mặc định" aria-label="Về tuyến mặc định">
+                    <img src="icon.png" alt="">
                 </button>
-                <button id="btn-pick-location" class="ctrl-btn" title="Chọn vị trí thủ công trên bản đồ">
-                    <span class="ctrl-icon">📍</span>
+                <input type="search" id="search-input" placeholder="Tìm số tuyến hoặc điểm dừng" autocomplete="off" enterkeyhint="search">
+                <button id="btn-clear-search" class="icon-btn" hidden aria-label="Xoá">✕</button>
+            </div>
+
+            <div id="route-row" class="route-row" hidden>
+                <button id="btn-route-info" class="route-name" title="Xem danh sách điểm dừng">
+                    <span id="route-code" class="route-code">--</span>
+                    <span id="route-title" class="route-title">Đang tải...</span>
                 </button>
-                <button id="btn-refresh-realtime" class="ctrl-btn" title="Làm mới realtime">
-                    <span class="ctrl-icon">🔄</span>
-                </button>
+                <div class="segmented" role="tablist">
+                    <button id="btn-dir-go" class="active">Đi</button>
+                    <button id="btn-dir-ret">Về</button>
+                </div>
+                <button id="btn-set-default" class="icon-btn star" title="Đặt làm tuyến mặc định">☆</button>
             </div>
 
-            <!-- Loading overlay -->
-            <div id="loading-spinner" class="loading-spinner" style="display: none;">
-                <div class="spinner"></div>
-                <span id="loading-text">Đang tải dữ liệu...</span>
+            <div id="saved-row" class="chips" hidden></div>
+        </div>
+
+        <div id="search-dropdown" class="card dropdown" hidden></div>
+
+        <!-- Trạng thái cảnh báo đang bật (gộp cả canh xe đến trạm & canh xe xuất bến) -->
+        <div id="status-alert" class="status-pill" hidden>
+            <span id="status-alert-text"></span>
+            <button id="btn-stop-alert" class="link-btn">Tắt</button>
+        </div>
+        <div id="status-departure" class="status-pill" hidden>
+            <span id="status-departure-text"></span>
+            <button id="btn-stop-departure" class="link-btn">Huỷ</button>
+        </div>
+    </header>
+
+    <!-- Nút nổi trên bản đồ -->
+    <div class="fab-group">
+        <button id="btn-locate" class="fab" title="Vị trí của tôi" aria-label="Vị trí của tôi">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+        </button>
+        <button id="btn-open-sheet" class="fab" title="Danh sách xe & điểm dừng" aria-label="Danh sách">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+            <span id="fab-bus-count" class="fab-badge" hidden>0</span>
+        </button>
+    </div>
+
+    <!-- Thẻ trạm đang chọn: xe gần nhất & ETA -->
+    <section id="focus-card" class="card focus-card" hidden>
+        <div class="focus-head">
+            <div class="focus-title">
+                <div id="focus-name" class="focus-name"></div>
+                <div class="focus-sub"><span id="focus-dir" class="dir-tag"></span> <span id="focus-route"></span></div>
             </div>
-        </main>
-
-        <!-- Sidebar Backdrop (bấm ra ngoài để đóng sidebar) -->
-        <div id="sidebar-backdrop" class="sidebar-backdrop" style="display: none;"></div>
-
-        <!-- Sidebar Drawer (Danh sách xe đang chạy & điểm dừng - Ẩn mặc định) -->
-        <aside id="bottom-sheet" class="app-sidebar bottom-sheet closed collapsed">
-            <div class="sidebar-header">
-                <div class="sidebar-title-wrap">
-                    <span class="sidebar-title-icon">📋</span>
-                    <span class="sidebar-title-text">Danh sách xe & Điểm dừng</span>
-                </div>
-                <button id="btn-close-sidebar" class="sidebar-close-btn" title="Đóng danh sách">✕ Đóng</button>
+            <button id="btn-focus-fav" class="icon-btn star" title="Lưu trạm">☆</button>
+            <button id="btn-focus-close" class="icon-btn" title="Bỏ chọn trạm" aria-label="Bỏ chọn trạm">✕</button>
+        </div>
+        <div class="focus-body">
+            <div class="eta">
+                <div id="focus-eta" class="eta-big">--</div>
+                <div id="focus-detail" class="eta-detail"></div>
             </div>
-
-            <div class="sheet-tabs">
-                <button class="sheet-tab active" data-tab="tab-buses">🚌 Xe đang chạy (<span id="bus-count">0</span>)</button>
-                <button class="sheet-tab" id="tab-btn-stations" data-tab="tab-stations">🚏 Điểm dừng (<span id="station-count">0</span>)</button>
-                <button class="sheet-tab" id="tab-btn-info" data-tab="tab-info">ℹ️ Thông tin</button>
+            <div class="focus-actions">
+                <button id="btn-focus-bus" class="btn" hidden>Xem xe</button>
+                <button id="btn-focus-alert" class="btn btn-primary">Báo xe đến</button>
             </div>
+        </div>
+        <div id="focus-next" class="focus-next" hidden></div>
+    </section>
 
-            <div class="sheet-content">
-                <!-- Tab 1: Xe đang chạy realtime -->
-                <div id="tab-buses" class="tab-pane active">
-                    <div id="realtime-bus-list" class="realtime-bus-list">
-                        <div class="empty-hint">Gõ số tuyến hoặc tên điểm dừng (VD: 83, Chợ Gạo) để theo dõi xe đang chạy thời gian thực.</div>
-                    </div>
-                </div>
-
-                <!-- Tab 2: Danh sách trạm dừng -->
-                <div id="tab-stations" class="tab-pane">
-                    <div id="station-list" class="station-list">
-                        <div class="empty-hint">Chưa có thông tin trạm dừng.</div>
-                    </div>
-                </div>
-
-                <!-- Tab 3: Thông tin chi tiết & Cập nhật -->
-                <div id="tab-info" class="tab-pane">
-                    <div id="route-details-info" class="route-details-info">
-                        <div class="empty-hint">Chọn một tuyến để xem lịch trình hoạt động.</div>
-                    </div>
-                    <div class="app-version-card">
-                        <div class="app-version-header">
-                            <div>
-                                <div style="font-weight: 800; font-size: 14.5px; color: #0f172a;">Tìm Bus Promax</div>
-                                <div style="font-size: 12px; color: #64748b;">Phiên bản: <b id="info-current-ver">v1.2.6</b></div>
-                            </div>
-                            <button id="btn-manual-check-update" class="btn-primary" style="padding: 6px 12px; font-size: 12px; border-radius: 8px;">
-                                🔄 Kiểm tra cập nhật
-                            </button>
-                        </div>
-                    </div>
-                </div>
+    <!-- Danh sách (bottom sheet trên điện thoại, panel bên trái trên máy tính) -->
+    <div id="sheet-backdrop" class="backdrop" hidden></div>
+    <aside id="sheet" class="sheet" aria-hidden="true">
+        <div class="sheet-head">
+            <div class="tabs">
+                <button class="tab active" data-tab="buses">Xe <span id="bus-count" class="count">0</span></button>
+                <button class="tab" data-tab="stations">Điểm dừng <span id="station-count" class="count">0</span></button>
+                <button class="tab" data-tab="info">Thông tin</button>
             </div>
-        </aside>
-
-        <!-- Proximity Alert Setup Modal (Cảnh báo xe sắp đến) -->
-        <div id="alert-modal" class="modal-backdrop" style="display: none;">
-            <div class="modal-card">
-                <div class="modal-header">
-                    <h3>🔔 Cài đặt cảnh báo xe đến</h3>
-                    <button id="modal-close-btn" class="close-x">✕</button>
-                </div>
-                <div class="modal-body">
-                    <div class="selected-target">
-                        <div class="label">Tuyến xe:</div>
-                        <div class="val" id="modal-route-name">Tuyến --</div>
-                        <div class="label" style="margin-top: 8px;">Điểm dừng đón xe:</div>
-                        <div class="val station-highlight" id="modal-station-name">Chưa chọn trạm</div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="alert-distance-select">Báo cho tôi khi xe cách trạm:</label>
-                        <select id="alert-distance-select" class="form-select">
-                            <option value="300">Khoảng 300 mét (~1 phút tới nơi)</option>
-                            <option value="500" selected>Khoảng 500 mét (~2 phút tới nơi - Khuyên dùng)</option>
-                            <option value="1000">Khoảng 1.000 mét (~3-4 phút tới nơi)</option>
-                            <option value="1500">Khoảng 1.500 mét (~5 phút tới nơi)</option>
-                            <option value="2000">Khoảng 2.000 mét (~7 phút tới nơi)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group-checkbox">
-                        <label class="switch-wrap">
-                            <input type="checkbox" id="chk-call" checked>
-                            <span class="switch-slider"></span>
-                            <span class="switch-text">📞 <b>Mô phỏng cuộc gọi đến & Giọng nói tiếng Việt</b></span>
-                        </label>
-                    </div>
-
-                    <div class="form-group-checkbox">
-                        <label class="switch-wrap">
-                            <input type="checkbox" id="chk-sound" checked>
-                            <span class="switch-slider"></span>
-                            <span class="switch-text">🔊 Nhạc chuông điện thoại</span>
-                        </label>
-                    </div>
-
-                    <div class="form-group-checkbox">
-                        <label class="switch-wrap">
-                            <input type="checkbox" id="chk-vibrate" checked>
-                            <span class="switch-slider"></span>
-                            <span class="switch-text">📳 Rung chuông điện thoại</span>
-                        </label>
-                    </div>
-
-                    <div class="form-group-checkbox">
-                        <label class="switch-wrap">
-                            <input type="checkbox" id="chk-notification" checked>
-                            <span class="switch-slider"></span>
-                            <span class="switch-text">🔔 Thông báo màn hình (Notification)</span>
-                        </label>
-                    </div>
-
-                    <button id="btn-test-alert-sound" class="btn-secondary" style="margin-top: 10px; width: 100%;">📞 Thử nghiệm mô phỏng cuộc gọi xe đến</button>
-                </div>
-                <div class="modal-footer">
-                    <button id="btn-cancel-modal" class="btn-secondary">Hủy</button>
-                    <button id="btn-activate-alert" class="btn-primary">Kích hoạt cảnh báo</button>
+            <button id="btn-close-sheet" class="icon-btn" aria-label="Đóng">✕</button>
+        </div>
+        <div class="sheet-body">
+            <div id="pane-buses" class="pane active"><div class="empty">Chưa có xe nào đang chạy.</div></div>
+            <div id="pane-stations" class="pane"></div>
+            <div id="pane-info" class="pane">
+                <div id="route-info"></div>
+                <div class="version-row">
+                    <span>Tìm Bus Promax <b id="app-version">--</b></span>
+                    <button id="btn-check-update" class="btn">Kiểm tra cập nhật</button>
                 </div>
             </div>
         </div>
+    </aside>
 
-        <!-- Departure Alert Setup Modal (Canh xe xuất bến) -->
-        <div id="departure-modal" class="modal-backdrop" style="display: none;">
-            <div class="modal-card">
-                <div class="modal-header">
-                    <h3>🚀 Canh xe xuất bến (Bắt đầu chạy)</h3>
-                    <button id="modal-departure-close-btn" class="close-x">✕</button>
-                </div>
-                <div class="modal-body">
-                    <div class="selected-target">
-                        <div class="label">Xe buýt chọn theo dõi:</div>
-                        <div class="val" id="dep-modal-plate" style="font-size: 17px; font-weight: 800; color: #2563eb;">29E-XXXXX</div>
-                        <div class="label" style="margin-top: 8px;">Tuyến & Trạng thái:</div>
-                        <div class="val station-highlight" id="dep-modal-status">Đang đỗ tại bến xuất phát</div>
-                    </div>
+    <!-- Hộp thoại cảnh báo (dùng chung cho "báo xe đến trạm" và "canh xe xuất bến") -->
+    <div id="alert-modal" class="modal" hidden>
+        <div class="card modal-card">
+            <h3 id="alert-modal-title">Báo khi xe sắp đến</h3>
+            <p id="alert-modal-target" class="muted"></p>
 
-                    <div style="margin: 12px 0 8px 0; font-size: 13px; color: #475569; line-height: 1.45;">
-                        Hệ thống sẽ liên tục quét tín hiệu GPS của xe này. Ngay khi xe <b>bắt đầu chuyển bánh rời bến</b>, ứng dụng sẽ lập tức kích hoạt:
-                    </div>
+            <label id="distance-field" class="field">
+                <span>Báo khi xe còn cách</span>
+                <select id="alert-distance">
+                    <option value="300">300 m (~1 phút)</option>
+                    <option value="500" selected>500 m (~2 phút)</option>
+                    <option value="1000">1 km (~3–4 phút)</option>
+                    <option value="1500">1,5 km (~5 phút)</option>
+                    <option value="2000">2 km (~7 phút)</option>
+                </select>
+            </label>
 
-                    <div class="form-group-checkbox">
-                        <label class="switch-wrap">
-                            <input type="checkbox" id="chk-dep-call" checked>
-                            <span class="switch-slider"></span>
-                            <span class="switch-text">📞 <b>Mô phỏng cuộc gọi đến & Giọng nói tiếng Việt</b></span>
-                        </label>
-                    </div>
+            <label class="toggle"><input type="checkbox" id="chk-call" checked><span>Mô phỏng cuộc gọi + giọng nói</span></label>
+            <label class="toggle"><input type="checkbox" id="chk-sound" checked><span>Chuông</span></label>
+            <label class="toggle"><input type="checkbox" id="chk-vibrate" checked><span>Rung</span></label>
 
-                    <div class="form-group-checkbox">
-                        <label class="switch-wrap">
-                            <input type="checkbox" id="chk-dep-sound" checked>
-                            <span class="switch-slider"></span>
-                            <span class="switch-text">🔊 Nhạc chuông điện thoại reo liên tục</span>
-                        </label>
-                    </div>
-
-                    <div class="form-group-checkbox">
-                        <label class="switch-wrap">
-                            <input type="checkbox" id="chk-dep-vibrate" checked>
-                            <span class="switch-slider"></span>
-                            <span class="switch-text">📳 Rung chuông điện thoại</span>
-                        </label>
-                    </div>
-
-                    <button id="btn-test-dep-call" class="btn-secondary" style="margin-top: 10px; width: 100%;">📞 Thử nghiệm mô phỏng cuộc gọi đến</button>
-                </div>
-                <div class="modal-footer">
-                    <button id="btn-cancel-departure-modal" class="btn-secondary">Hủy</button>
-                    <button id="btn-activate-departure" class="btn-primary" style="background: #2563eb;">🚀 Bắt đầu canh xe rời bến</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- APP UPDATE MODAL DIALOG (Cơ chế Auto-Update bảo lưu dữ liệu 100% giống Query Tool) -->
-        <div id="update-modal" class="modal-backdrop" style="display: none;">
-            <div class="modal-card update-modal-card">
-                <div class="modal-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 20px;">🚀</span>
-                        <h3 id="update-modal-title">Cập nhật Tìm Bus Promax</h3>
-                    </div>
-                    <button id="btn-close-update-modal" class="close-x">✕</button>
-                </div>
-                <div class="modal-body" id="update-modal-body">
-                    <!-- Dynamic content filled by JS -->
-                </div>
-                <div class="modal-footer" id="update-modal-footer">
-                    <button id="btn-cancel-update" class="btn-secondary">Để sau</button>
-                    <button id="btn-confirm-update" class="btn-primary" style="background: #2563eb;">⚡ Cập nhật ngay</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- SIMULATED INCOMING CALL OVERLAY (Mô phỏng cuộc gọi đến khi xe rời bến) -->
-        <div id="incoming-call-overlay" class="incoming-call-overlay" style="display: none;">
-            <div class="call-backdrop-blur"></div>
-            <div class="call-container">
-                <div class="call-top-indicator">
-                    <span class="call-pulse-badge">● CUỘC GỌI ĐẾN</span>
-                </div>
-                
-                <div class="caller-avatar-wrap">
-                    <div class="caller-pulse-ring ring-1"></div>
-                    <div class="caller-pulse-ring ring-2"></div>
-                    <div class="caller-avatar-circle">🚌</div>
-                </div>
-
-                <div class="caller-details">
-                    <h2 id="call-caller-name">Xe 29E-95736</h2>
-                    <p id="call-caller-sub">Tuyến 83 • Đã xuất bến!</p>
-                    <div id="call-status-label" class="call-status-label">Đang đổ chuông...</div>
-                    <div id="call-timer" class="call-timer" style="display: none;">00:00</div>
-                </div>
-
-                <!-- Call Action Buttons -->
-                <div id="call-ringing-actions" class="call-actions-row">
-                    <div class="call-action-btn-wrap">
-                        <button id="btn-decline-call" class="call-btn btn-decline" title="Từ chối">
-                            <span class="call-icon">📵</span>
-                        </button>
-                        <span class="call-btn-label">Từ chối</span>
-                    </div>
-
-                    <div class="call-action-btn-wrap">
-                        <button id="btn-accept-call" class="call-btn btn-accept" title="Trả lời">
-                            <span class="call-icon">📞</span>
-                        </button>
-                        <span class="call-btn-label">Trả lời</span>
-                    </div>
-                </div>
-
-                <!-- In-Call Active Action Buttons -->
-                <div id="call-active-actions" class="call-actions-row" style="display: none;">
-                    <div class="call-action-btn-wrap">
-                        <button id="btn-hangup-call" class="call-btn btn-decline" title="Kết thúc cuộc gọi">
-                            <span class="call-icon">📵</span>
-                        </button>
-                        <span class="call-btn-label">Kết thúc</span>
-                    </div>
-                </div>
+            <div class="modal-actions">
+                <button id="btn-test-alert" class="link-btn">Thử chuông</button>
+                <span class="spacer"></span>
+                <button id="btn-cancel-alert" class="btn">Huỷ</button>
+                <button id="btn-activate-alert" class="btn btn-primary">Bật</button>
             </div>
         </div>
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- Hộp thoại cập nhật -->
+    <div id="update-modal" class="modal" hidden>
+        <div class="card modal-card">
+            <h3 id="update-title">Cập nhật</h3>
+            <div id="update-body"></div>
+            <div class="modal-actions">
+                <span class="spacer"></span>
+                <button id="btn-cancel-update" class="btn">Để sau</button>
+                <button id="btn-confirm-update" class="btn btn-primary">Cập nhật</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Màn hình mô phỏng cuộc gọi đến -->
+    <div id="call-overlay" class="call-overlay" hidden>
+        <div class="call-label">Cuộc gọi đến</div>
+        <div class="call-avatar">🚌</div>
+        <h2 id="call-name">Xe --</h2>
+        <p id="call-sub"></p>
+        <div id="call-status" class="call-status">Đang đổ chuông...</div>
+        <div class="call-actions">
+            <button id="btn-call-decline" class="call-btn decline" aria-label="Từ chối">✕</button>
+            <button id="btn-call-accept" class="call-btn accept" aria-label="Trả lời">✆</button>
+        </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+    <div id="loading" class="loading" hidden><div class="spinner"></div></div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="geo.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

@@ -1,2141 +1,320 @@
+/* Tìm Bus Promax — giao diện tối giản: bản đồ toàn màn hình, các thẻ nổi nhẹ */
 :root {
-    --primary: #0066cc;
-    --primary-dark: #004c99;
-    --primary-light: #e6f0fa;
-    --accent: #ff6f00;
-    --success: #2e7d32;
-    --danger: #d32f2f;
-    --warning: #ed6c02;
-    --bg-main: #f8fafc;
-    --bg-card: #ffffff;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    --border-color: #e2e8f0;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-    --radius-sm: 8px;
-    --radius-md: 14px;
-    --radius-lg: 20px;
+    --primary: #2563eb;
+    --go: #2563eb;
+    --go-bg: #eff6ff;
+    --ret: #ea580c;
+    --ret-bg: #fff7ed;
+    --danger: #dc2626;
+    --text: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --bg: #ffffff;
+    --soft: #f1f5f9;
+    --radius: 14px;
+    --shadow: 0 2px 10px rgba(15, 23, 42, .12);
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    -webkit-tap-highlight-color: transparent;
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
 
-body, html {
-    width: 100%;
+html, body {
     height: 100%;
     overflow: hidden;
-    background-color: var(--bg-main);
-    color: var(--text-primary);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    background: var(--soft);
 }
 
-.app-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    width: 100%;
-    position: relative;
-}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; touch-action: manipulation; }
+input, select { font: inherit; color: inherit; }
 
-/* TOP APP BAR */
-.top-bar {
-    position: relative;
-    z-index: 1000;
-    background: var(--bg-card);
-    padding: calc(var(--safe-top) + 10px) 14px 10px 14px;
-    box-shadow: var(--shadow-sm);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    border-bottom: 1px solid var(--border-color);
-}
+#map { position: fixed; inset: 0; z-index: 0; }
 
-.brand {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-}
+.card { background: var(--bg); border-radius: var(--radius); box-shadow: var(--shadow); }
+.muted { color: var(--muted); }
 
-.brand-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+/* ---------- Nút chung ---------- */
+.icon-btn {
+    width: 34px; height: 34px; flex-shrink: 0;
+    display: grid; place-items: center;
+    border-radius: 50%; color: var(--muted); font-size: 15px;
 }
+.icon-btn:hover { background: var(--soft); }
+.icon-btn.star { font-size: 19px; }
+.icon-btn.star.on { color: #eab308; }
 
-.brand-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+.btn {
+    padding: 8px 14px; border-radius: 10px;
+    background: var(--soft); font-weight: 600; white-space: nowrap;
 }
+.btn:hover { background: var(--line); }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-danger { background: var(--danger); color: #fff; }
+.link-btn { color: var(--primary); font-weight: 600; padding: 4px 6px; }
 
-.btn-check-update {
-    background: #f1f5f9;
-    color: #475569;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 5px 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-}
-
-.btn-check-update:hover {
-    background: #e2e8f0;
-    color: #1e293b;
-}
-
-.btn-check-update.has-update {
-    background: #fef2f2;
-    color: #dc2626;
-    border-color: #fca5a5;
-    animation: updatePulse 1.8s infinite;
-}
-
-@keyframes updatePulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
-    50% { transform: scale(1.04); box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
-}
-
-.update-modal-card {
+/* ---------- Thanh trên ---------- */
+.top {
+    position: fixed; z-index: 1000;
+    top: calc(10px + var(--safe-top)); left: 10px; right: 10px;
     max-width: 440px;
-}
-
-.app-version-card {
-    margin-top: 14px;
-    padding: 12px 14px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: var(--radius-md);
-}
-
-.app-version-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.btn-toggle-top-controls {
-    background: #eff6ff;
-    color: #1d4ed8;
-    border: 1px solid #bfdbfe;
-    border-radius: 8px;
-    font-size: 11.5px;
-    font-weight: 700;
-    padding: 5px 9px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    user-select: none;
-}
-
-.btn-toggle-top-controls:hover {
-    background: #dbeafe;
-    color: #1e40af;
-    border-color: #93c5fd;
-}
-
-.btn-toggle-top-controls.is-collapsed {
-    background: #f8fafc;
-    color: #0284c7;
-    border-color: #7dd3fc;
-    box-shadow: 0 1px 3px rgba(2, 132, 199, 0.15);
-}
-
-body.top-controls-collapsed .search-box,
-body.top-controls-collapsed #search-dropdown,
-body.top-controls-collapsed #active-route-bar {
-    display: none !important;
-}
-
-body.top-controls-collapsed .top-bar {
-    padding-bottom: 8px;
-    gap: 0;
-}
-
-.bus-icon-badge {
-    width: 38px;
-    height: 38px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    box-shadow: 0 2px 6px rgba(0, 102, 204, 0.25);
-    flex-shrink: 0;
-}
-
-.bus-icon-badge img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.brand-text h1 {
-    font-size: 17px;
-    font-weight: 800;
-    color: var(--primary-dark);
-    letter-spacing: -0.3px;
-    line-height: 1.2;
-}
-
-.status-live {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--success);
-    letter-spacing: 0.2px;
-}
-
-/* SEARCH INPUT */
-.search-box {
-    position: relative;
-    display: flex;
-    align-items: center;
-    background: var(--bg-main);
-    border: 1.5px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 0 12px;
-    height: 44px;
-    transition: all 0.2s ease;
-}
-
-.search-box:focus-within {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.15);
-    background: #fff;
-}
-
-.search-icon {
-    font-size: 15px;
-    color: var(--text-muted);
-    margin-right: 8px;
-}
-
-.search-box input {
-    flex: 1;
-    border: none;
-    outline: none;
-    background: transparent;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
-.search-box input::placeholder {
-    color: var(--text-muted);
-    font-size: 13.5px;
-}
-
-.clear-btn {
-    background: #cbd5e1;
-    border: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    color: #fff;
-    cursor: pointer;
-}
-
-/* SEARCH DROPDOWN */
-.search-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 14px;
-    right: 14px;
-    background: #fff;
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border-color);
-    max-height: 320px;
-    overflow-y: auto;
-    z-index: 1010;
-    margin-top: 6px;
-}
-
-.dropdown-item {
-    padding: 12px 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border-bottom: 1px solid #f1f5f9;
-    cursor: pointer;
-    transition: background 0.15s ease;
-}
-
-.dropdown-item:active, .dropdown-item:hover {
-    background: var(--primary-light);
-}
-
-.dropdown-badge {
-    background: var(--primary);
-    color: #fff;
-    font-weight: 700;
-    font-size: 13px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    min-width: 44px;
-    text-align: center;
-}
-
-.dropdown-info {
-    flex: 1;
-}
-
-.dropdown-name {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--text-primary);
-    line-height: 1.3;
-}
-
-.dropdown-desc {
-    font-size: 11.5px;
-    color: var(--text-secondary);
-    margin-top: 2px;
-}
-
-.dropdown-fav-btn {
-    background: transparent;
-    border: none;
-    font-size: 22px;
-    color: #cbd5e1;
-    cursor: pointer;
-    padding: 6px 10px;
-    border-radius: 8px;
-    transition: all 0.15s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    line-height: 1;
-}
-
-.dropdown-fav-btn:hover {
-    background: #fef9c3;
-    color: #ca8a04;
-}
-
-.dropdown-fav-btn.is-fav {
-    color: #eab308;
-    text-shadow: 0 1px 3px rgba(202, 138, 4, 0.5);
-}
-
-/* ACTIVE ROUTE BAR */
-.active-route-bar {
-    background: #fff;
-    border-bottom: 1px solid var(--border-color);
-    padding: 10px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    z-index: 900;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-}
-
-.route-badge-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 8px;
-    transition: background 0.15s ease;
-}
-
-.route-badge-box:active {
-    background: #f1f5f9;
-}
-
-.route-code-badge {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff;
-    font-weight: 800;
-    font-size: 17px;
-    padding: 6px 10px;
-    border-radius: 10px;
-    min-width: 48px;
-    text-align: center;
-    box-shadow: 0 2px 4px rgba(25, 118, 210, 0.3);
-    flex-shrink: 0;
-}
-
-.route-title-wrap {
-    flex: 1;
-    min-width: 0;
-}
-
-.route-title-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.route-title-wrap h2 {
-    font-size: 14.5px;
-    font-weight: 800;
-    color: var(--text-primary);
-    line-height: 1.35;
-    word-break: break-word;
-}
-
-.route-expand-hint {
-    font-size: 11px;
-    font-weight: 700;
-    color: #0284c7;
-    background: #e0f2fe;
-    padding: 2px 7px;
-    border-radius: 6px;
-    white-space: nowrap;
-    border: 1px solid #bae6fd;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    flex-shrink: 0;
-}
-
-.route-title-wrap p {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-top: 2px;
-}
-
-/* DÒNG RIÊNG BIỆT: DANH SÁCH ĐIỂM DỪNG ĐÃ LƯU (HÀNG THỨ 3 TRỰC QUAN) */
-.saved-stations-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-top: 6px;
-    margin-top: 2px;
-    border-top: 1px dashed #e2e8f0;
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-}
-
-.saved-stations-bar::-webkit-scrollbar {
-    display: none;
-}
-
-.saved-stations-header {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-    color: #854d0e;
-    font-size: 11.5px;
-    font-weight: 800;
-}
-
-.saved-stations-chips {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: nowrap;
-}
-
-.saved-station-chip {
-    background: #fef9c3;
-    border: 1px solid #fde047;
-    color: #854d0e;
-    padding: 3px 9px;
-    border-radius: 14px;
-    font-size: 11.5px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(234, 179, 8, 0.15);
-    transition: all 0.15s ease;
-}
-
-.saved-station-chip:hover {
-    background: #fef08a;
-    border-color: #eab308;
-}
-
-.saved-station-chip:active {
-    transform: scale(0.96);
-}
-
-.saved-station-chip.chip-dir-go {
-    background: #eff6ff;
-    border-color: #bfdbfe;
-    color: #1d4ed8;
-    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12);
-}
-.saved-station-chip.chip-dir-go:hover {
-    background: #dbeafe;
-    border-color: #93c5fd;
-}
-.saved-station-chip.chip-dir-go .chip-del-btn {
-    background: rgba(29, 78, 216, 0.12);
-    color: #1d4ed8;
-}
-
-.saved-station-chip.chip-dir-ret {
-    background: #fff7ed;
-    border-color: #fed7aa;
-    color: #c2410c;
-    box-shadow: 0 1px 3px rgba(234, 88, 12, 0.12);
-}
-.saved-station-chip.chip-dir-ret:hover {
-    background: #ffedd5;
-    border-color: #fdba74;
-}
-.saved-station-chip.chip-dir-ret .chip-del-btn {
-    background: rgba(194, 65, 12, 0.12);
-    color: #c2410c;
-}
-
-.chip-del-btn {
-    background: rgba(133, 77, 14, 0.15);
-    border: none;
-    color: #854d0e;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 9px;
-    font-weight: 800;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.chip-del-btn:hover {
-    background: #ef4444;
-    color: #fff;
-}
-
-.direction-switch {
-    display: flex;
-    background: #f1f5f9;
-    padding: 3px;
-    border-radius: 10px;
-    gap: 2px;
-}
-
-.dir-btn {
-    border: none;
-    outline: none;
-    background: transparent;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    border-radius: 7px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.dir-btn.active {
-    background: #fff;
-    color: var(--primary);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-/* ALERT BANNER */
-.alert-banner {
-    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-    border-bottom: 2px solid #ffb74d;
-    padding: 10px 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    z-index: 950;
-    animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-    from { transform: translateY(-100%); }
-    to { transform: translateY(0); }
-}
-
-.alert-icon-wrap {
-    font-size: 22px;
-    animation: ring 1.5s infinite;
-}
-
-@keyframes ring {
-    0%, 100% { transform: rotate(0); }
-    20%, 60% { transform: rotate(15deg); }
-    40%, 80% { transform: rotate(-15deg); }
-}
-
-.alert-info-wrap {
-    flex: 1;
-}
-
-.alert-station-name {
-    font-size: 13px;
-    font-weight: 700;
-    color: #e65100;
-}
-
-.alert-status-text {
-    font-size: 11.5px;
-    color: #bf360c;
-    margin-top: 1px;
-}
-
-.alert-stop-btn {
-    background: #e65100;
-    color: #fff;
-    border: none;
-    padding: 5px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-/* MAP WRAPPER */
-.map-wrapper {
-    flex: 1;
-    position: relative;
-    width: 100%;
-    height: 100%;
-}
-
-#map {
-    width: 100%;
-    height: 100%;
-    z-index: 100;
-}
-
-/* MAP FLOATING CONTROLS */
-.map-controls {
-    position: absolute;
-    right: 14px;
-    bottom: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    z-index: 500;
-}
-
-.ctrl-btn {
-    width: 46px;
-    height: 46px;
-    background: #fff;
-    border: none;
-    border-radius: 50%;
-    box-shadow: var(--shadow-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: transform 0.15s ease, background 0.15s ease;
-}
-
-.ctrl-btn:active {
-    transform: scale(0.92);
-    background: #f1f5f9;
-}
-
-.ctrl-icon {
-    font-size: 20px;
-}
-
-/* SIDEBAR DRAWER (Ẩn/Hiện danh sách xe đang chạy & điểm dừng - Mặc định ẩn) */
-.app-sidebar,
-.bottom-sheet {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 390px;
-    max-width: 92vw;
-    background: #ffffff;
-    border-radius: 0;
-    box-shadow: 4px 0 28px rgba(0,0,0,0.18);
-    z-index: 1000;
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    max-height: 100vh;
-}
-
-.app-sidebar.closed,
-.app-sidebar.collapsed,
-.bottom-sheet.closed,
-.bottom-sheet.collapsed {
-    transform: translateX(-100%);
-    visibility: hidden;
+    display: flex; flex-direction: column; gap: 8px;
     pointer-events: none;
 }
+.top > * { pointer-events: auto; }
 
-.app-sidebar.open,
-.app-sidebar.expanded,
-.bottom-sheet.open,
-.bottom-sheet.expanded {
-    transform: translateX(0);
-    visibility: visible;
-    pointer-events: auto;
+.search-card { padding: 6px; }
+.search-row { display: flex; align-items: center; gap: 6px; }
+.logo { width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; overflow: hidden; }
+.logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#search-input {
+    flex: 1; min-width: 0; height: 38px;
+    border: 0; outline: 0; background: transparent; font-size: 15px;
 }
+#search-input::-webkit-search-cancel-button { display: none; }
 
-.sidebar-header {
-    padding: 14px 16px;
-    background: #f8fafc;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+.route-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line);
 }
-
-.sidebar-title-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.route-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; text-align: left; padding: 2px; }
+.route-code {
+    flex-shrink: 0; min-width: 36px; padding: 3px 8px; border-radius: 8px;
+    background: var(--primary); color: #fff; font-weight: 700; text-align: center;
 }
+.route-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.sidebar-title-icon {
-    font-size: 18px;
+.segmented { display: flex; background: var(--soft); border-radius: 10px; padding: 3px; flex-shrink: 0; }
+.segmented button { padding: 4px 12px; border-radius: 8px; font-weight: 600; color: var(--muted); }
+.segmented button.active { background: var(--bg); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+#btn-dir-go.active { color: var(--go); }
+#btn-dir-ret.active { color: var(--ret); }
+
+.chips { display: flex; gap: 6px; overflow-x: auto; margin-top: 6px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+    flex-shrink: 0; display: flex; align-items: center; gap: 4px;
+    max-width: 200px; padding: 4px 6px 4px 10px; border-radius: 999px;
+    background: var(--soft); font-size: 13px;
 }
+.chip-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-del { color: var(--muted); font-size: 12px; padding: 0 4px; }
 
-.sidebar-title-text {
-    font-size: 15px;
-    font-weight: 800;
-    color: #0f172a;
+/* ---------- Kết quả tìm kiếm ---------- */
+.dropdown { max-height: 60vh; overflow-y: auto; padding: 4px 0; }
+.dd-header { padding: 8px 14px 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.dd-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; }
+.dd-item:hover { background: var(--soft); }
+.dd-badge {
+    flex-shrink: 0; min-width: 40px; padding: 3px 6px; border-radius: 8px;
+    background: var(--go-bg); color: var(--primary); font-weight: 700; text-align: center;
 }
+.dd-info { flex: 1; min-width: 0; }
+.dd-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dd-desc { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dd-empty { padding: 14px; color: var(--muted); }
 
-.sidebar-close-btn {
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
-    color: #475569;
-    padding: 5px 11px;
-    border-radius: 8px;
-    font-size: 12.5px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
+.dir-tag { font-size: 12px; font-weight: 600; }
+.dir-tag.go { color: var(--go); }
+.dir-tag.ret { color: var(--ret); }
 
-.sidebar-close-btn:hover {
-    background: #fee2e2;
-    color: #ef4444;
-    border-color: #fca5a5;
-}
-
-.sidebar-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.45);
-    backdrop-filter: blur(2px);
-    z-index: 995;
-    transition: opacity 0.25s ease;
-}
-
-/* Floating button on map to open sidebar */
-.floating-sidebar-pill {
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    z-index: 500;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: #ffffff;
-    border: 1.5px solid #cbd5e1;
-    padding: 7px 13px;
-    border-radius: 24px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-    cursor: pointer;
-    font-family: inherit;
+/* ---------- Trạng thái cảnh báo ---------- */
+.status-pill {
+    align-self: flex-start; max-width: 100%;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px 6px 12px; border-radius: 999px;
+    background: #fffbeb; border: 1px solid #fde68a; box-shadow: var(--shadow);
     font-size: 13px;
-    font-weight: 700;
-    color: #0f172a;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.status-pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status-pill.hot { background: #fef2f2; border-color: #fecaca; color: var(--danger); font-weight: 600; }
+
+/* ---------- Nút nổi ---------- */
+.fab-group {
+    position: fixed; z-index: 900;
+    right: 12px; bottom: calc(20px + var(--safe-bottom));
+    display: flex; flex-direction: column; gap: 10px;
+    transition: bottom .2s;
+}
+body.has-focus .fab-group { bottom: calc(170px + var(--safe-bottom)); }
+.fab {
+    position: relative; width: 46px; height: 46px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--bg); color: var(--text); box-shadow: var(--shadow);
+}
+.fab-badge {
+    position: absolute; top: -4px; right: -4px;
+    min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+    background: var(--primary); color: #fff; font-size: 11px; font-weight: 700;
+    display: grid; place-items: center;
 }
 
-.floating-sidebar-pill:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
-    border-color: #94a3b8;
+/* ---------- Thẻ trạm đang chọn ---------- */
+.focus-card {
+    position: fixed; z-index: 950;
+    left: 10px; right: 10px; bottom: calc(10px + var(--safe-bottom));
+    max-width: 440px; padding: 10px 12px 12px;
+}
+.focus-head { display: flex; align-items: flex-start; gap: 2px; }
+.focus-title { flex: 1; min-width: 0; }
+.focus-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-sub { font-size: 12px; color: var(--muted); }
+.focus-body { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.eta { flex: 1; min-width: 0; }
+.eta-big { font-size: 24px; font-weight: 800; line-height: 1.1; }
+.eta-detail { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-actions { display: flex; gap: 6px; }
+.focus-next { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+
+/* ---------- Danh sách (sheet) ---------- */
+.backdrop { position: fixed; inset: 0; z-index: 1900; background: rgba(15, 23, 42, .3); }
+.sheet {
+    position: fixed; z-index: 2000;
+    left: 0; right: 0; bottom: 0; height: 70vh;
+    display: flex; flex-direction: column;
+    background: var(--bg); border-radius: 18px 18px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.15);
+    transform: translateY(105%); transition: transform .25s ease;
+    padding-bottom: var(--safe-bottom);
+}
+.sheet.open { transform: none; }
+.sheet-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 0 12px; border-bottom: 1px solid var(--line); }
+.tabs { flex: 1; display: flex; gap: 4px; overflow-x: auto; }
+.tab { padding: 8px 10px 10px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.count { font-size: 12px; font-weight: 600; background: var(--soft); border-radius: 8px; padding: 0 6px; }
+.sheet-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.pane { display: none; }
+.pane.active { display: block; }
+.empty { padding: 24px 16px; text-align: center; color: var(--muted); }
+
+.row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--soft); cursor: pointer;
+}
+.row:hover { background: #f8fafc; }
+.row.hl { background: #fefce8; }
+.row-main { flex: 1; min-width: 0; }
+.row-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-side { text-align: right; flex-shrink: 0; }
+.row-side b { display: block; font-size: 14px; }
+.row-side small { color: var(--muted); }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: var(--go); }
+.dot.ret { background: var(--ret); }
+.order {
+    width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%;
+    display: grid; place-items: center; background: var(--soft);
+    font-size: 12px; font-weight: 700; color: var(--muted);
 }
 
-.floating-sidebar-pill .pill-badge {
-    background: #eff6ff;
-    color: #2563eb;
-    border: 1px solid #bfdbfe;
-    border-radius: 12px;
-    padding: 2px 7px;
-    font-size: 11.5px;
-    font-weight: 800;
+.info { padding: 12px 14px; }
+.info dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+.info dt { color: var(--muted); }
+.info dd { font-weight: 600; }
+.info h4 { margin: 14px 0 4px; font-size: 13px; }
+.info p { color: #334155; font-size: 13px; }
+.version-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin: 8px 14px 16px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted);
 }
 
-/* Top bar toggle sidebar button */
-.btn-toggle-sidebar {
-    background: #ffffff;
-    border: 1.5px solid #cbd5e1;
-    color: #1e293b;
-    padding: 5px 10px;
-    border-radius: 8px;
-    font-size: 12.5px;
-    font-weight: 700;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    transition: all 0.2s ease;
+/* ---------- Hộp thoại ---------- */
+.modal {
+    position: fixed; inset: 0; z-index: 3000;
+    display: grid; place-items: center; padding: 16px;
+    background: rgba(15, 23, 42, .45);
 }
+.modal-card { width: 100%; max-width: 380px; padding: 18px; max-height: 90vh; overflow-y: auto; }
+.modal-card h3 { font-size: 17px; }
+.modal-card > p { margin: 4px 0 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+.field select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
+.toggle { display: flex; align-items: center; gap: 10px; padding: 7px 0; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--primary); }
+.modal-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.spacer { flex: 1; }
+#update-body ul { margin: 8px 0 0 18px; font-size: 13px; color: #334155; }
+#update-body li { margin-bottom: 4px; }
 
-.btn-toggle-sidebar:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
+/* ---------- Cuộc gọi mô phỏng ---------- */
+.call-overlay {
+    position: fixed; inset: 0; z-index: 5000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    background: linear-gradient(#0f172a, #1e293b); color: #fff; text-align: center; padding: 24px;
 }
-
-.sheet-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border-color);
-    padding: 0 12px;
+.call-label { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: #94a3b8; }
+.call-avatar {
+    width: 96px; height: 96px; margin: 16px 0; border-radius: 50%;
+    display: grid; place-items: center; font-size: 48px; background: #334155;
+    animation: pulse 1.4s infinite;
 }
+.call-overlay h2 { font-size: 26px; }
+.call-overlay p { color: #cbd5e1; }
+.call-status { margin-top: 4px; color: #94a3b8; font-size: 13px; }
+.call-actions { display: flex; gap: 64px; margin-top: 48px; }
+.call-btn { width: 66px; height: 66px; border-radius: 50%; font-size: 28px; color: #fff; }
+.call-btn.decline { background: #ef4444; }
+.call-btn.accept { background: #22c55e; }
+.call-overlay.active .accept { display: none; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(148,163,184,.5); } 50% { box-shadow: 0 0 0 18px rgba(148,163,184,0); } }
 
-.sheet-tab {
-    flex: 1;
-    border: none;
-    background: transparent;
-    padding: 10px 0;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-muted);
-    cursor: pointer;
-    position: relative;
-    transition: color 0.2s ease;
+/* ---------- Toast & loading ---------- */
+.toast {
+    position: fixed; z-index: 4000; left: 50%; bottom: calc(80px + var(--safe-bottom));
+    transform: translateX(-50%); max-width: calc(100% - 32px);
+    padding: 10px 16px; border-radius: 12px;
+    background: rgba(15, 23, 42, .92); color: #fff; font-size: 13.5px; text-align: center;
 }
+.loading { position: fixed; inset: 0; z-index: 2500; display: grid; place-items: center; background: rgba(255,255,255,.4); }
+.spinner { width: 34px; height: 34px; border: 3px solid var(--line); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.sheet-tab.active {
-    color: var(--primary);
+/* ---------- Marker trên bản đồ ---------- */
+.stop-icon { background: none; border: 0; }
+.stop-dot {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; border: 3px solid var(--go);
 }
-
-.sheet-tab.active::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 20%;
-    right: 20%;
-    height: 3px;
-    background: var(--primary);
-    border-radius: 3px 3px 0 0;
-}
-
-.sheet-tab-collapse-btn {
-    border: 1px solid #cbd5e1;
-    background: #f8fafc;
-    color: #475569;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    margin: auto 0 auto 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-    user-select: none;
-}
-
-.sheet-tab-collapse-btn:hover {
-    background: #e2e8f0;
-    color: #0f172a;
-    border-color: #94a3b8;
-}
-
-.sheet-tab-collapse-btn:active {
-    transform: scale(0.95);
-}
-
-.sheet-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 14px calc(var(--safe-bottom) + 20px) 14px;
-    min-height: 250px;
-}
-
-.tab-pane {
+.stop-icon.ret .stop-dot { border-color: var(--ret); }
+.stop-icon.terminal .stop-dot { width: 16px; height: 16px; border-color: var(--text); }
+.stop-icon.selected .stop-dot { width: 18px; height: 18px; background: #facc15; border-color: var(--text); }
+.stop-label {
     display: none;
-}
-
-.tab-pane.active {
-    display: block;
-}
-
-/* BUS CARD ITEM */
-.bus-card {
-    background: #fff;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 12px;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: var(--shadow-sm);
-    transition: transform 0.15s ease;
-}
-
-.bus-card:active {
-    transform: scale(0.98);
-}
-
-.bus-plate-wrap {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.bus-plate-icon {
-    font-size: 22px;
-    background: #eff6ff;
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.bus-plate-title {
-    font-weight: 800;
-    font-size: 14.5px;
-    color: var(--text-primary);
-}
-
-.bus-route-direction {
-    font-size: 11.5px;
-    color: var(--text-secondary);
-}
-
-.bus-proximity-stats {
-    text-align: right;
-}
-
-.bus-distance {
-    font-size: 15px;
-    font-weight: 800;
-    color: var(--accent);
-}
-
-.bus-eta {
-    font-size: 11px;
-    color: var(--text-muted);
-}
-
-/* STATION LIST ITEM */
-.station-item {
-    display: flex;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid #f1f5f9;
-    gap: 12px;
-}
-
-.station-order {
-    width: 26px;
-    height: 26px;
-    background: #f1f5f9;
-    color: var(--text-secondary);
-    font-weight: 700;
-    font-size: 12px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.station-info {
-    flex: 1;
-}
-
-.station-name {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.station-address {
-    font-size: 11.5px;
-    color: var(--text-secondary);
-    margin-top: 1px;
-}
-
-.btn-station-alert {
-    background: #fff;
-    border: 1px solid #fed7aa;
-    color: #ea580c;
-    padding: 6px 10px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.btn-station-alert:active {
-    background: #ffedd5;
-}
-
-/* ROUTE DETAIL INFO TAB */
-.info-card {
-    background: #f8fafc;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 14px;
-    margin-bottom: 10px;
-}
-
-.info-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    font-size: 13px;
-}
-
-.info-row:last-child {
-    margin-bottom: 0;
-}
-
-.info-label {
-    color: var(--text-muted);
-    font-weight: 500;
-}
-
-.info-value {
-    color: var(--text-primary);
-    font-weight: 700;
-    text-align: right;
-}
-
-.info-desc-box {
-    margin-top: 10px;
-}
-
-.info-desc-box h4 {
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    margin-bottom: 4px;
-}
-
-.info-desc-box p {
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--text-primary);
-}
-
-/* MODAL */
-.modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(4px);
-    z-index: 2000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.modal-card {
-    background: #fff;
-    width: 100%;
-    max-width: 400px;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    overflow: hidden;
-    animation: popUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes popUp {
-    from { transform: scale(0.92); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
-.modal-header {
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.modal-header h3 {
-    font-size: 16px;
-    font-weight: 800;
-    color: var(--text-primary);
-}
-
-.close-x {
-    border: none;
-    background: #f1f5f9;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    font-size: 14px;
-    color: var(--text-secondary);
-    cursor: pointer;
-}
-
-.modal-body {
-    padding: 16px 18px;
-}
-
-.selected-target {
-    background: #f8fafc;
-    border: 1px solid var(--border-color);
-    padding: 12px;
-    border-radius: var(--radius-sm);
-    margin-bottom: 14px;
-}
-
-.selected-target .label {
-    font-size: 11.5px;
-    color: var(--text-muted);
-    font-weight: 600;
-}
-
-.selected-target .val {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-top: 2px;
-}
-
-.selected-target .station-highlight {
-    color: var(--primary);
-}
-
-.form-group {
-    margin-bottom: 14px;
-}
-
-.form-group label {
-    display: block;
-    font-size: 13px;
-    font-weight: 700;
-    margin-bottom: 6px;
-}
-
-.form-group select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1.5px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    font-size: 13.5px;
-    font-weight: 600;
-    outline: none;
-    background: #fff;
-}
-
-.form-group-checkbox {
-    margin-bottom: 10px;
-}
-
-.switch-wrap {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.switch-wrap input {
-    margin-right: 10px;
-    width: 18px;
-    height: 18px;
-    accent-color: var(--primary);
-}
-
-.modal-footer {
-    padding: 12px 18px;
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-}
-
-.btn-primary {
-    background: var(--primary);
-    color: #fff;
-    border: none;
-    padding: 10px 18px;
-    border-radius: var(--radius-sm);
-    font-size: 13.5px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.15s ease;
-}
-
-.btn-primary:active {
-    background: var(--primary-dark);
-}
-
-.btn-secondary {
-    background: #f1f5f9;
-    color: var(--text-secondary);
-    border: none;
-    padding: 10px 16px;
-    border-radius: var(--radius-sm);
-    font-size: 13.5px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-/* SPINNER */
-.loading-spinner {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(15, 23, 42, 0.85);
-    color: #fff;
-    padding: 14px 20px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    z-index: 1000;
-    font-size: 13px;
-    font-weight: 600;
-}
-
-.spinner {
-    width: 20px;
-    height: 20px;
-    border: 3px solid rgba(255, 255, 255, 0.3);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.empty-hint {
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 13px;
-    padding: 30px 16px;
-    line-height: 1.5;
-}
-
-/* LEAFLET REAL BUS MARKERS (Hình ảnh xe buýt thật, nhận biết chiều đi/về qua màu sắc) */
-.bus-real-marker {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    user-select: none;
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
-    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.42));
-}
-
-.bus-real-marker:hover {
-    transform: scale(1.22);
-    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.65));
-    z-index: 1000 !important;
-}
-
-.bus-real-img {
-    width: 52px;
-    height: 34px;
-    object-fit: contain;
-    display: block;
-    user-select: none;
-    -webkit-user-drag: none;
-    pointer-events: none;
-}
-
-/* Chiều đi (Xanh dương) */
-.bus-real-marker.bus-dir-go {
-    filter: drop-shadow(0 4px 8px rgba(37, 99, 235, 0.45));
-}
-.bus-real-marker.bus-dir-go:hover {
-    filter: drop-shadow(0 6px 14px rgba(37, 99, 235, 0.7));
-}
-
-/* Chiều về (Cam đỏ) */
-.bus-real-marker.bus-dir-ret {
-    filter: drop-shadow(0 4px 8px rgba(234, 88, 12, 0.45));
-}
-.bus-real-marker.bus-dir-ret:hover {
-    filter: drop-shadow(0 6px 14px rgba(234, 88, 12, 0.7));
-}
-
-/* Hiệu ứng trượt xe mượt mà từng giây */
-.bus-smooth-marker {
-    transition: transform 0.95s linear !important;
-}
-
-/* Nút đặt tuyến mặc định */
-.route-actions-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.btn-set-default {
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
-    color: #475569;
-    padding: 5px 9px;
-    font-size: 11.5px;
-    font-weight: 700;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-}
-
-.btn-set-default:hover {
-    background: #fefce8;
-    border-color: #fde047;
-    color: #a16207;
-}
-
-.btn-set-default.is-default {
-    background: #fef08a;
-    border-color: #eab308;
-    color: #854d0e;
-    box-shadow: 0 1px 3px rgba(234, 179, 8, 0.3);
-}
-
-/* PHÂN BIỆT ĐIỂM DỪNG CHIỀU ĐI VÀ CHIỀU VỀ TRONG SEARCH DROPDOWN */
-.station-badge.badge-go {
-    background: #0284c7 !important;
-}
-.station-badge.badge-ret {
-    background: #ea580c !important;
-}
-
-.dir-pill {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 12px;
-    margin-left: 6px;
-    vertical-align: middle;
-}
-
-.dir-pill.pill-go {
-    background: #e0f2fe;
-    color: #0369a1;
-    border: 1px solid #bae6fd;
-}
-
-.dir-pill.pill-ret {
-    background: #ffedd5;
-    color: #c2410c;
-    border: 1px solid #fed7aa;
-}
-
-/* Biển báo Trạm dừng xe buýt chuẩn App gốc */
-.station-marker-pin {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    user-select: none;
-}
-
-.station-pin-icon {
-    width: 22px;
-    height: 22px;
-    background: #0284c7;
-    border: 2px solid #ffffff;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.station-pin-label {
-    background: rgba(255, 255, 255, 0.96);
-    color: #0369a1;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-top: 3px;
-    white-space: nowrap;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-    border: 1px solid #bae6fd;
-    max-width: 130px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Direction arrow on road ribbon */
-.road-arrow-marker {
-    color: #ea580c;
-    font-size: 13px;
-    font-weight: 900;
-    text-shadow: 0 0 2px #ffffff;
-    opacity: 0.85;
-}
-
-.station-marker-icon {
-    background: #2563eb;
-    border: 2px solid #fff;
-    border-radius: 50%;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-}
-
-.station-marker-start {
-    background: #16a34a !important;
-}
-
-.station-marker-end {
-    background: #dc2626 !important;
-}
-
-/* DROPDOWN CATEGORY HEADERS */
-.dropdown-header {
-    background: #f8fafc;
-    color: var(--text-muted);
-    font-size: 11px;
-    font-weight: 800;
-    padding: 6px 14px;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid var(--border-color);
-    position: sticky;
-    top: 0;
-    z-index: 5;
-}
-
-.station-badge {
-    background: #ea580c !important;
-    font-size: 11px !important;
-    padding: 3px 6px !important;
-    min-width: 38px !important;
-}
-
-/* LOCATION HINT TOAST */
-.location-hint-toast {
-    position: absolute;
-    top: 140px;
-    left: 14px;
-    right: 14px;
-    background: rgba(15, 23, 42, 0.92);
-    color: #fff;
-    padding: 10px 14px;
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    font-size: 12.5px;
-    line-height: 1.4;
-    z-index: 800;
-    animation: fadeIn 0.3s ease;
-}
-
-.toast-close {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: #fff;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-/* ======================================================== */
-/* ĐIỂM DỪNG ĐÃ LƯU & NÚT YÊU THÍCH (FAVORITE STATIONS) */
-/* ======================================================== */
-.btn-fav-station {
-    background: transparent;
-    border: none;
-    font-size: 17px;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 6px;
-    transition: transform 0.15s ease;
-    opacity: 0.45;
-}
-
-.btn-fav-station:hover {
-    transform: scale(1.2);
-    opacity: 0.9;
-}
-
-.btn-fav-station.is-fav {
-    opacity: 1;
-    color: #eab308;
-    filter: drop-shadow(0 1px 3px rgba(234, 179, 8, 0.4));
-}
-
-.station-item.is-fav {
-    background: #fefce8;
-    border-left: 3px solid #eab308;
-    padding-left: 8px;
-    border-radius: 6px;
-}
-
-@keyframes stationTargetPulse {
-    0% { background: #fef08a; transform: scale(1.02); }
-    50% { background: #fde047; transform: scale(1.03); }
-    100% { background: #fefce8; transform: scale(1); }
-}
-
-.station-item.highlight-target {
-    animation: stationTargetPulse 1.2s ease 2;
-    border-radius: 8px;
-}
-
-/* ======================================================== */
-/* CANH XE XUẤT BẾN (DEPARTURE ALERT & BUTTONS) */
-/* ======================================================== */
-.btn-bus-departure {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    color: #1d4ed8;
-    padding: 5px 8px;
-    border-radius: 6px;
-    font-size: 11.5px;
-    font-weight: 700;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-}
-
-.btn-bus-departure:hover {
-    background: #2563eb;
-    color: #fff;
-    border-color: #2563eb;
-}
-
-.departure-active-banner {
-    background: linear-gradient(135deg, #1e40af, #2563eb) !important;
-    border-bottom: 2px solid #60a5fa !important;
-}
-
-/* ======================================================== */
-/* MÔ PHỎNG CUỘC GỌI ĐẾN (SIMULATED INCOMING PHONE CALL UI) */
-/* ======================================================== */
-.incoming-call-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(10, 15, 29, 0.96);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: callFadeIn 0.35s ease;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-}
-
-@keyframes callFadeIn {
-    from { opacity: 0; transform: scale(0.97); }
-    to { opacity: 1; transform: scale(1); }
-}
-
-.call-container {
-    width: 90%;
-    max-width: 380px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    color: #fff;
-    padding: 30px 20px;
-}
-
-.call-pulse-badge {
-    background: rgba(34, 197, 94, 0.2);
-    color: #4ade80;
-    border: 1px solid rgba(74, 222, 128, 0.4);
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    animation: callBadgeBlink 1.2s infinite;
-}
-
-@keyframes callBadgeBlink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-}
-
-.caller-avatar-wrap {
-    position: relative;
-    width: 120px;
-    height: 120px;
-    margin: 36px 0 24px 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.caller-avatar-circle {
-    width: 88px;
-    height: 88px;
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 44px;
-    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.6);
-    z-index: 2;
-    animation: avatarWiggle 1.5s infinite;
-}
-
-@keyframes avatarWiggle {
-    0%, 100% { transform: scale(1); }
-    15% { transform: scale(1.08) rotate(-4deg); }
-    30% { transform: scale(1.08) rotate(4deg); }
-    45% { transform: scale(1.05) rotate(-2deg); }
-}
-
-.caller-pulse-ring {
-    position: absolute;
-    border-radius: 50%;
-    border: 2px solid rgba(59, 130, 246, 0.5);
-    animation: callPulseRing 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-}
-
-.ring-1 { width: 105px; height: 105px; }
-.ring-2 { width: 130px; height: 130px; animation-delay: 0.6s; }
-
-@keyframes callPulseRing {
-    0% { transform: scale(0.7); opacity: 0.9; }
-    100% { transform: scale(1.4); opacity: 0; }
-}
-
-.caller-details h2 {
-    font-size: 23px;
-    font-weight: 800;
-    color: #ffffff;
-    margin: 0;
-    letter-spacing: 0.5px;
-}
-
-.caller-details p {
-    font-size: 14.5px;
-    color: #93c5fd;
-    margin: 6px 0 0 0;
-    font-weight: 600;
-}
-
-.call-status-label {
-    font-size: 13px;
-    color: #94a3b8;
-    margin-top: 10px;
-    font-weight: 500;
-}
-
-.call-timer {
-    font-size: 16px;
-    font-weight: 700;
-    color: #4ade80;
-    margin-top: 10px;
-    font-variant-numeric: tabular-nums;
-}
-
-.call-actions-row {
-    display: flex;
-    justify-content: space-around;
-    width: 100%;
-    margin-top: 48px;
-    gap: 40px;
-}
-
-.call-action-btn-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-}
-
-.call-btn {
-    width: 68px;
-    height: 68px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-    transition: transform 0.15s ease, filter 0.15s ease;
-}
-
-.call-btn:active {
-    transform: scale(0.9);
-}
-
-.btn-accept {
-    background: linear-gradient(135deg, #22c55e, #16a34a);
-    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5);
-    animation: acceptPulse 1.4s infinite;
-}
-
-@keyframes acceptPulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
-    50% { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(34, 197, 94, 0); }
-}
-
-.btn-decline {
-    background: linear-gradient(135deg, #ef4444, #dc2626);
-    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
-}
-
-.call-btn-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #cbd5e1;
-}
-
-/* ========================================================
-   STATION FOCUS & NEAREST BUS HIGHLIGHT
-   ======================================================== */
-.station-focus-card {
-    background: #ffffff;
-    border-bottom: 2px solid #e2e8f0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-    padding: 10px 14px;
-    z-index: 900;
-    position: relative;
-    animation: slideDownIn 0.25s ease-out;
-}
-
-@keyframes slideDownIn {
-    from { opacity: 0; transform: translateY(-8px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.station-focus-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.station-focus-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-}
-
-.station-focus-icon {
-    font-size: 20px;
-    flex-shrink: 0;
-}
-
-.station-focus-texts {
-    min-width: 0;
-}
-
-.station-focus-name {
-    font-size: 14.5px;
-    font-weight: 800;
-    color: #0f172a;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 230px;
-}
-
-.station-focus-sub {
-    display: flex;
-    align-items: center;
-    margin-top: 2px;
-}
-
-.station-focus-close {
-    background: #f1f5f9;
-    border: none;
-    color: #64748b;
-    font-size: 11.5px;
-    font-weight: 700;
-    padding: 5px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: all 0.2s;
-}
-
-.station-focus-close:hover {
-    background: #e2e8f0;
-    color: #0f172a;
-}
-
-.station-focus-content {
-    margin-top: 8px;
-}
-
-.station-nearest-box {
-    background: linear-gradient(135deg, #fffbeb, #fef3c7);
-    border: 1.5px solid #f59e0b;
-    border-radius: 10px;
-    padding: 9px 12px;
-}
-
-.nearest-bus-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.nearest-badge {
-    background: #d97706;
-    color: #ffffff;
-    font-size: 10.5px;
-    font-weight: 800;
-    padding: 2px 8px;
-    border-radius: 6px;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-}
-
-.nearest-plate {
-    font-weight: 800;
-    font-size: 15px;
-    color: #0f172a;
-}
-
-.nearest-bus-metrics {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 7px;
-    background: #ffffff;
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 1px solid #fde68a;
-}
-
-.metric-item {
-    display: flex;
-    flex-direction: column;
-}
-
-.metric-label {
-    font-size: 10.5px;
-    color: #64748b;
-    font-weight: 600;
-}
-
-.metric-value {
-    font-size: 13px;
-    font-weight: 800;
-    color: #0f172a;
-}
-
-.metric-value.dist-highlight {
-    color: #d97706;
-    font-size: 14.5px;
-}
-
-.metric-value.time-highlight {
-    color: #2563eb;
-    font-size: 14.5px;
-}
-
-.next-bus-hint {
-    margin-top: 6px;
-    font-size: 11.5px;
-    color: #475569;
-}
-
-.nearest-bus-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 6px;
-    margin-top: 8px;
-}
-
-.btn-focus-action {
-    border: none;
-    border-radius: 6px;
-    padding: 6px 4px;
-    font-size: 11.5px;
-    font-weight: 700;
-    cursor: pointer;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    transition: transform 0.1s, opacity 0.2s;
-    touch-action: manipulation;
-}
-
-.btn-focus-action:active {
-    transform: scale(0.96);
-}
-
-.btn-locate-bus {
-    background: #0066cc;
-    color: #ffffff;
-}
-
-.btn-alert-bus {
-    background: #ea580c;
-    color: #ffffff;
-}
-
-.btn-departure-bus {
-    background: #10b981;
-    color: #ffffff;
-}
-
-.station-no-bus {
-    padding: 8px 12px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 12.5px;
-    color: #475569;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-/* LEAFLET NEAREST BUS REAL MARKER GLOW & PULSE */
-.bus-real-marker.bus-real-nearest {
-    animation: realNearestGlow 1.2s infinite alternate ease-in-out !important;
-    filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.95)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) !important;
-    z-index: 9999 !important;
-}
-
-.bus-real-marker.bus-real-nearest .bus-real-img {
-    width: 60px;
-    height: 39px;
-}
-
-@keyframes realNearestGlow {
-    0% {
-        transform: scale(1.05);
-        filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8)) drop-shadow(0 3px 6px rgba(0, 0, 0, 0.4));
+    position: absolute; left: 50%; top: calc(50% + 10px); transform: translateX(-50%);
+    max-width: 140px; padding: 1px 6px; border-radius: 6px;
+    background: rgba(255,255,255,.92); box-shadow: 0 1px 3px rgba(0,0,0,.15);
+    font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Chỉ hiện tên trạm khi phóng to đủ gần, hoặc trạm đang chọn */
+.show-labels .stop-label, .stop-icon.selected .stop-label, .stop-icon.terminal .stop-label { display: block; }
+
+.bus-icon { background: none; border: 0; }
+.bus-icon img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+.bus-icon.nearest img { filter: drop-shadow(0 0 4px #facc15) drop-shadow(0 0 2px #f59e0b); }
+.leaflet-marker-icon.bus-icon { transition: transform .95s linear; }
+.zooming .leaflet-marker-icon.bus-icon { transition: none; }
+
+.user-dot { background: none; border: 0; }
+
+.leaflet-popup-content { margin: 10px 12px; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.popup-title { font-weight: 700; font-size: 15px; }
+.popup-line { color: var(--muted); margin-top: 2px; }
+.popup .btn { width: 100%; margin-top: 8px; }
+
+/* ---------- Máy tính: danh sách thành panel bên trái ---------- */
+@media (min-width: 900px) {
+    .sheet {
+        top: 0; right: auto; width: 380px; height: auto;
+        border-radius: 0; transform: translateX(-105%);
+        box-shadow: 4px 0 20px rgba(0,0,0,.12);
     }
-    100% {
-        transform: scale(1.18);
-        filter: drop-shadow(0 0 16px rgba(245, 158, 11, 1)) drop-shadow(0 6px 14px rgba(0, 0, 0, 0.6));
-    }
+    .sheet.open { transform: none; }
+    .backdrop { display: none !important; }
+    body.sheet-open .top, body.sheet-open .focus-card { left: 390px; }
+    .focus-card { right: auto; width: 420px; }
 }
-
-.bus-nearest-pill {
-    background: #f59e0b;
-    color: #000000;
-    font-size: 10.5px;
-    font-weight: 900;
-    padding: 1px 6px;
-    border-radius: 6px;
-    margin-left: 4px;
-    letter-spacing: 0.2px;
-    display: inline-flex;
-    align-items: center;
-    white-space: nowrap;
-}
-
-.bus-subdist-pill {
-    background: rgba(255, 255, 255, 0.25);
-    color: #ffffff;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 4px;
-    margin-left: 4px;
-    white-space: nowrap;
-}
-
-.bus-card.bus-card-nearest {
-    background: #fffbeb !important;
-    border: 1.5px solid #f59e0b !important;
-    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);
-}
-
-.bus-card-nearest-badge {
-    background: #d97706;
-    color: #ffffff;
-    font-size: 10px;
-    font-weight: 800;
-    padding: 1px 6px;
-    border-radius: 4px;
-    text-transform: uppercase;
-}
-
-/* ========================================================
-   MINIMALIST COMPACT MODES & TOGGLES (TỐI GIẢN GIAO DIỆN)
-   ======================================================== */
-.station-focus-header-btns {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-}
-
-.station-focus-toggle-btn {
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    color: #334155;
-    font-size: 11.5px;
-    font-weight: 700;
-    padding: 5px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    transition: all 0.15s ease;
-    touch-action: manipulation;
-}
-
-.station-focus-toggle-btn:hover {
-    background: #e2e8f0;
-    color: #0f172a;
-}
-
-/* KHI THU GỌN: BIẾN THÀNH 1 THANH CAPSULE NẰM GỌN GÀNG CAO ~36PX */
-.station-focus-card.is-collapsed {
-    padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(8px);
-    border-bottom: 1.5px solid #cbd5e1;
-}
-
-.station-focus-card.is-collapsed .station-focus-header {
-    padding-bottom: 0;
-    border-bottom: none;
-}
-
-.station-focus-card.is-collapsed .station-focus-content {
-    display: none !important;
-}
-
-.station-focus-card.is-collapsed #station-focus-route-tag {
-    display: none;
-}
-
-.station-focus-card.is-collapsed .station-focus-mini-summary {
-    display: inline-flex !important;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 800;
-    color: #d97706;
-    background: #fef3c7;
-    padding: 1px 6px;
-    border-radius: 5px;
-    margin-left: 6px;
-    white-space: nowrap;
-}
-
-/* ALERT BANNER MINIMAL ACTIONS */
-.alert-actions-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-}
-
-.alert-min-btn {
-    background: rgba(0, 0, 0, 0.08);
-    border: none;
-    color: #334155;
-    font-size: 11px;
-    font-weight: 800;
-    padding: 4px 7px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background 0.15s;
-    touch-action: manipulation;
-}
-
-.alert-min-btn:hover {
-    background: rgba(0, 0, 0, 0.15);
-}
-
-.alert-banner.is-collapsed {
-    padding: 6px 12px;
-}
-
-.alert-banner.is-collapsed .alert-status-text {
-    display: none !important;
-}
-
-.alert-banner.is-collapsed .alert-station-name {
-    font-size: 12px;
-}
-
-/* NÚT BẢN ĐỒ GOOGLE MAPS / VỆ TINH */
-.btn-map-layer-active {
-    background: #0066cc !important;
-    color: #ffffff !important;
-}
-
-
-
