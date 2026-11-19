@@ -294,8 +294,9 @@ body.has-focus .fab-group { bottom: calc(170px + var(--safe-bottom)); }
 .show-labels .stop-label, .stop-icon.selected .stop-label, .stop-icon.terminal .stop-label { display: block; }
 
 .bus-icon { background: none; border: 0; }
-.bus-icon img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
-.bus-icon.nearest img { filter: drop-shadow(0 0 4px #facc15) drop-shadow(0 0 2px #f59e0b); }
+.bus-rot { width: 100%; height: 100%; transition: transform .9s linear; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+.bus-rot svg { display: block; }
+.bus-icon.nearest .bus-rot { filter: drop-shadow(0 0 3px #facc15) drop-shadow(0 0 2px #f59e0b); }
 .leaflet-marker-icon.bus-icon { transition: transform .95s linear; }
 .zooming .leaflet-marker-icon.bus-icon { transition: none; }
 

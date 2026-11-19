@@ -16,8 +16,8 @@ const KEY = {
     dismissedUpdate: 'bus_update_dismissed',
     ringTested: 'bus_ring_tested'
 };
-const BUS_SIZE = [46, 30];
-const BUS_SIZE_NEAREST = [58, 38];
+const BUS_SIZE = [18, 18];
+const BUS_SIZE_NEAREST = [24, 24];
 
 const $ = id => document.getElementById(id);
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -478,13 +478,29 @@ function positionBus(b) {
     b.s = targetS - (b.partRemained || 0);
     const p = Geo.pointAt(geo, b.s);
     if (p) { b.lat = p.lat; b.lng = p.lng; }
+    const a = Geo.pointAt(geo, b.s - 10), z = Geo.pointAt(geo, b.s + 10);
+    if (a && z && (a.lat !== z.lat || a.lng !== z.lng)) b.heading = Geo.bearing(a.lat, a.lng, z.lat, z.lng);
+}
+
+// Xoay đầu xe theo hướng chạy (cộng dồn góc để xoay theo đường ngắn nhất, không quay vòng)
+function applyHeading(b) {
+    if (b.heading == null) return;
+    const prev = b.rot == null ? b.heading : b.rot;
+    const d = ((b.heading - prev) % 360 + 540) % 360 - 180;
+    b.rot = prev + d;
+    const el = b.marker?.getElement()?.firstElementChild;
+    if (el) el.style.transform = `rotate(${b.rot}deg)`;
 }
 
 function busIcon(b, nearest) {
     const [w, h] = nearest ? BUS_SIZE_NEAREST : BUS_SIZE;
+    const color = b.isGo === false ? '#ea580c' : '#2563eb';
+    const rot = b.rot == null ? (b.heading || 0) : b.rot;
+    // Xe nhìn từ trên xuống, đầu xe hướng lên (Bắc) rồi xoay theo hướng chạy
+    const svg = `<svg viewBox="0 0 20 20" width="${w}" height="${h}"><rect x="6.5" y="1.5" width="7" height="17" rx="2.4" fill="${color}" stroke="#fff" stroke-width="1.2"/><rect x="7.8" y="3" width="4.4" height="3" rx="1" fill="#fff"/></svg>`;
     return L.divIcon({
         className: `bus-icon${nearest ? ' nearest' : ''}`,
-        html: `<img src="${b.isGo === false ? 'bus_real_ret.png' : 'bus_real_go.png'}" alt="" draggable="false">`,
+        html: `<div class="bus-rot" style="transform:rotate(${rot}deg)">${svg}</div>`,
         iconSize: [w, h],
         iconAnchor: [w / 2, h / 2]
     });
@@ -575,6 +591,7 @@ function applyBuses(list) {
                 .addTo(state.layers.buses);
         } else {
             b.marker.setLatLng([b.lat, b.lng]);
+            applyHeading(b);
             if (dirChanged) { b.nearest = null; setBusIcon(b, b.plate === state.nearestPlate); }
         }
         checkDeparture(b);
@@ -599,6 +616,7 @@ function tick() {
         if (b.timeRemained > 0) b.timeRemained--;
         positionBus(b);
         b.marker.setLatLng([b.lat, b.lng]);
+        applyHeading(b);
     }
     updateFocus();
     checkAlertLocal();
