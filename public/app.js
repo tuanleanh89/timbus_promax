@@ -475,10 +475,10 @@ function positionBus(b) {
     const geo = state.geo[dirOfBus(b)];
     if (!geo || !geo.path.length || !b.targetLat) { b.s = null; return; }
     const targetS = Geo.along(geo, b.targetLat, b.targetLng);
+    b.stationS = targetS;
     b.s = targetS - (b.partRemained || 0);
     const p = Geo.pointAt(geo, b.s);
     if (p) { b.lat = p.lat; b.lng = p.lng; }
-    b.sAt = performance.now();
     const h = headingAt(geo, b.s);
     if (h != null) b.heading = h;
 }
@@ -488,23 +488,43 @@ function headingAt(geo, s) {
     return a && z && (a.lat !== z.lat || a.lng !== z.lng) ? Geo.bearing(a.lat, a.lng, z.lat, z.lng) : null;
 }
 
-// Vẽ xe mượt ~60fps: ngoại suy theo vận tốc giữa 2 lần cập nhật rồi nội suy dần về vị trí thật,
-// nên xe trượt liên tục trên đường thay vì nhảy từng đoạn.
+// API không báo vận tốc (luôn 0) và ~15s mới có vị trí mới, nên tự ước lượng vận tốc
+// từ quãng đường xe đi được giữa 2 lần cập nhật liên tiếp.
+function recordSample(b) {
+    if (b.s == null) return;
+    const now = performance.now();
+    if (b.lastS != null) {
+        const dt = (now - b.lastSAt) / 1000;
+        if (dt < 1) return;
+        const vObs = Math.max(0, (b.s - b.lastS) / dt);
+        if (vObs < 25) b.v = b.v == null ? vObs : b.v * 0.4 + vObs * 0.6;
+    } else if (b.speed > 3) {
+        b.v = b.speed / 3.6;
+    }
+    b.lastS = b.s;
+    b.lastSAt = now;
+}
+
+// Vẽ xe ~60fps: xe chạy liên tục theo vận tốc ước lượng, mỗi lần có dữ liệu mới thì
+// chỉnh dần về vị trí thật (không giật lùi), nên xe trượt đều trên đường.
 let lastFrame = 0;
 function animateBuses(now) {
     requestAnimationFrame(animateBuses);
     const dt = Math.min(0.25, (now - (lastFrame || now)) / 1000);
     lastFrame = now;
     for (const b of state.buses.values()) {
-        if (!b.marker || b.s == null) continue;
+        if (!b.marker || b.lastS == null) continue;
         const geo = state.geo[dirOfBus(b)];
         if (!geo || !geo.path.length) continue;
-        let target = b.s;
-        if (b.speed > 3 && b.partRemained > 15) {
-            target += Math.min(30, (b.speed * 1000 / 3600) * ((now - (b.sAt || now)) / 1000));
+        const v = b.v || 0;
+        let target = b.lastS + v * Math.min(25, (now - b.lastSAt) / 1000);
+        if (b.stationS != null) target = Math.min(target, Math.max(b.lastS, b.stationS - 5));
+        if (b.ds == null || Math.abs(target - b.ds) > 500) b.ds = target;
+        else {
+            let step = (target - b.ds) * Math.min(1, dt * 0.8);
+            if (step < 0 && b.ds - target < 150) step = 0; // đi lố chút: đứng chờ, không lùi
+            b.ds += step;
         }
-        if (b.ds == null || Math.abs(target - b.ds) > 400) b.ds = target;
-        else b.ds += (target - b.ds) * Math.min(1, dt * 2.5);
         const p = Geo.pointAt(geo, b.ds);
         if (!p) continue;
         b.marker.setLatLng([p.lat, p.lng]);
@@ -616,13 +636,15 @@ function applyBuses(list) {
             Object.assign(b, data);
         }
         positionBus(b);
+        if (dirChanged) b.lastS = b.v = b.ds = null;
+        recordSample(b);
         if (!b.marker) {
             b.nearest = false;
             b.marker = L.marker([b.lat, b.lng], { icon: busIcon(b, false) })
                 .bindPopup(() => busPopupHtml(b), { offset: [0, -10] })
                 .addTo(state.layers.buses);
         } else {
-            if (dirChanged) { b.ds = null; b.nearest = null; setBusIcon(b, b.plate === state.nearestPlate); }
+            if (dirChanged) { b.nearest = null; setBusIcon(b, b.plate === state.nearestPlate); }
         }
         checkDeparture(b);
     }
