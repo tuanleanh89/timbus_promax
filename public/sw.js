@@ -2,7 +2,7 @@
 // - Ô bản đồ: lấy từ cache trước (cache-first), giữ tối đa MAX_TILES ô -> mở lại khu vực quen thuộc tức thì.
 // - Giao diện (HTML/JS/CSS/ảnh, Leaflet): lấy mạng trước, mất mạng thì dùng bản cache.
 // - API realtime: không can thiệp.
-const APP_CACHE = 'app-v3';
+const APP_CACHE = 'app-v4';
 const TILE_CACHE = 'tiles-v1';
 const MAX_TILES = 3000; // ~45 MB
 

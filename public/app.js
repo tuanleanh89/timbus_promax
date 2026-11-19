@@ -5,7 +5,7 @@
 // 0. HẰNG SỐ, TIỆN ÍCH
 // ==========================================
 const DEFAULT_ROUTE = '83';
-const POLL_MS = 4000;
+const POLL_MS = 3500;
 const ALERT_POLL_MS = 5000;
 const UPDATE_URL = 'https://raw.githubusercontent.com/tuanleanh89/timbus_promax/main/version.json';
 const KEY = {
@@ -16,8 +16,8 @@ const KEY = {
     dismissedUpdate: 'bus_update_dismissed',
     ringTested: 'bus_ring_tested'
 };
-const BUS_SIZE = [18, 18];
-const BUS_SIZE_NEAREST = [24, 24];
+const BUS_SIZE = [36, 36];
+const BUS_SIZE_NEAREST = [48, 48];
 
 const $ = id => document.getElementById(id);
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -478,9 +478,41 @@ function positionBus(b) {
     b.s = targetS - (b.partRemained || 0);
     const p = Geo.pointAt(geo, b.s);
     if (p) { b.lat = p.lat; b.lng = p.lng; }
-    const a = Geo.pointAt(geo, b.s - 10), z = Geo.pointAt(geo, b.s + 10);
-    if (a && z && (a.lat !== z.lat || a.lng !== z.lng)) b.heading = Geo.bearing(a.lat, a.lng, z.lat, z.lng);
+    b.sAt = performance.now();
+    const h = headingAt(geo, b.s);
+    if (h != null) b.heading = h;
 }
+
+function headingAt(geo, s) {
+    const a = Geo.pointAt(geo, s - 10), z = Geo.pointAt(geo, s + 10);
+    return a && z && (a.lat !== z.lat || a.lng !== z.lng) ? Geo.bearing(a.lat, a.lng, z.lat, z.lng) : null;
+}
+
+// Vẽ xe mượt ~60fps: ngoại suy theo vận tốc giữa 2 lần cập nhật rồi nội suy dần về vị trí thật,
+// nên xe trượt liên tục trên đường thay vì nhảy từng đoạn.
+let lastFrame = 0;
+function animateBuses(now) {
+    requestAnimationFrame(animateBuses);
+    const dt = Math.min(0.25, (now - (lastFrame || now)) / 1000);
+    lastFrame = now;
+    for (const b of state.buses.values()) {
+        if (!b.marker || b.s == null) continue;
+        const geo = state.geo[dirOfBus(b)];
+        if (!geo || !geo.path.length) continue;
+        let target = b.s;
+        if (b.speed > 3 && b.partRemained > 15) {
+            target += Math.min(30, (b.speed * 1000 / 3600) * ((now - (b.sAt || now)) / 1000));
+        }
+        if (b.ds == null || Math.abs(target - b.ds) > 400) b.ds = target;
+        else b.ds += (target - b.ds) * Math.min(1, dt * 2.5);
+        const p = Geo.pointAt(geo, b.ds);
+        if (!p) continue;
+        b.marker.setLatLng([p.lat, p.lng]);
+        const h = headingAt(geo, b.ds);
+        if (h != null) { b.heading = h; applyHeading(b); }
+    }
+}
+requestAnimationFrame(animateBuses);
 
 // Xoay đầu xe theo hướng chạy (cộng dồn góc để xoay theo đường ngắn nhất, không quay vòng)
 function applyHeading(b) {
@@ -494,10 +526,10 @@ function applyHeading(b) {
 
 function busIcon(b, nearest) {
     const [w, h] = nearest ? BUS_SIZE_NEAREST : BUS_SIZE;
-    const color = b.isGo === false ? '#ea580c' : '#2563eb';
+    const color = b.isGo === false ? '#16a34a' : '#7c3aed';
     const rot = b.rot == null ? (b.heading || 0) : b.rot;
     // Xe nhìn từ trên xuống, đầu xe hướng lên (Bắc) rồi xoay theo hướng chạy
-    const svg = `<svg viewBox="0 0 20 20" width="${w}" height="${h}"><rect x="6.5" y="1.5" width="7" height="17" rx="2.4" fill="${color}" stroke="#fff" stroke-width="1.2"/><rect x="7.8" y="3" width="4.4" height="3" rx="1" fill="#fff"/></svg>`;
+    const svg = `<svg viewBox="0 0 20 20" width="${w}" height="${h}"><rect x="6.5" y="1.5" width="7" height="17" rx="2.4" fill="${color}" stroke="#fff" stroke-width="1.6"/><rect x="7.8" y="3" width="4.4" height="3" rx="1" fill="#fff"/></svg>`;
     return L.divIcon({
         className: `bus-icon${nearest ? ' nearest' : ''}`,
         html: `<div class="bus-rot" style="transform:rotate(${rot}deg)">${svg}</div>`,
@@ -590,9 +622,7 @@ function applyBuses(list) {
                 .bindPopup(() => busPopupHtml(b), { offset: [0, -10] })
                 .addTo(state.layers.buses);
         } else {
-            b.marker.setLatLng([b.lat, b.lng]);
-            applyHeading(b);
-            if (dirChanged) { b.nearest = null; setBusIcon(b, b.plate === state.nearestPlate); }
+            if (dirChanged) { b.ds = null; b.nearest = null; setBusIcon(b, b.plate === state.nearestPlate); }
         }
         checkDeparture(b);
     }
@@ -615,8 +645,6 @@ function tick() {
         b.partRemained = Math.max(0, b.partRemained - Math.min(14, (b.speed * 1000) / 3600));
         if (b.timeRemained > 0) b.timeRemained--;
         positionBus(b);
-        b.marker.setLatLng([b.lat, b.lng]);
-        applyHeading(b);
     }
     updateFocus();
     checkAlertLocal();
